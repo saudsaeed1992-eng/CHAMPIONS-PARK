@@ -212,8 +212,8 @@ export default function DashboardPage() {
       {/* NAV */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(232,245,233,0.96)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(134,168,134,0.3)', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '22px' }}>🏆</span>
-          <span style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: '700', color: '#1B3A2A' }}>Champions Park</span>
+          <img src="/logo.svg" alt="Champions Park" style={{ width: '32px', height: '32px' }} />
+<span style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: '700', color: '#1B3A2A' }}>Champions Park</span>
         </div>
         <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' }}>
           {[['plan', '🗓 Plan'], ['meals', '🍽 Meals'], ['progress', '📊 Progress'], ['photos', '📸 Photos']].map(([tab, label]) => (
