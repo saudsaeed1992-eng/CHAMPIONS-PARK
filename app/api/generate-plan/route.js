@@ -88,10 +88,10 @@ export async function POST(request) {
         + '- Schedule workouts within the ' + workoutStart + ' to ' + workoutEnd + ' window\n'
         + '- Generate ' + mealsPerDay + ' meal suggestions total (one per day rotating)\n'
         + '- Progressive intensity increase each week\n\n'
-        + 'Return ONLY this JSON structure, no other text:\n'
+      + 'IMPORTANT: Keep exercise notes under 8 words. Keep meal instructions under 15 words. Be very concise.\n\n'
+        + 'Return ONLY valid JSON, no markdown, no code fences:\n'
         + '{"plan_type":"weight_loss","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":8000,"water_liters":2.5},"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"string","emoji":"string","type":"cardio","duration":"string","exercises":[{"name":"string","sets":"string","reps":"string","rest":"string","notes":"string"}]}]}]},"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"string","calories":0,"protein":"string","ingredients":["string"],"instructions":"string"}]},"safety_notes":["string"],"motivation_message":"string"}\n\n'
-        + 'Generate all ' + planWeeks + ' weeks with workouts only on ' + workoutDaysList.join(', ') + '. Generate ' + mealsPerDay + ' varied meals. Respond with ONLY the JSON object.';
-
+        + 'Generate ' + planWeeks + ' weeks, workouts ONLY on ' + workoutDaysList.join(', ') + '. Max 4 exercises per day. ' + mealsPerDay + ' meals total. Short notes. JSON only.';
     } else {
       const dailyCalories = Math.round(weightKg * 24 * 1.1);
       const proteinGrams = Math.round(weightKg * 2);
@@ -115,9 +115,10 @@ export async function POST(request) {
         + '- Use Push/Pull/Legs/Upper split across the available workout days\n'
         + '- Generate ' + mealsPerDay + ' high-protein meal suggestions total\n'
         + '- Apply progressive overload in week 2 onwards\n\n'
-        + 'Return ONLY this JSON structure, no other text:\n'
++ 'IMPORTANT: Keep exercise notes under 8 words. Keep meal instructions under 15 words. Be very concise.\n\n'
+        + 'Return ONLY valid JSON, no markdown, no code fences:\n'
         + '{"plan_type":"bodybuilding","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":6000,"water_liters":3.5},"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"string","emoji":"string","type":"strength","duration":"string","exercises":[{"name":"string","sets":"string","reps":"string","rest":"string","notes":"string"}]}]}]},"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"string","calories":0,"protein":"string","ingredients":["string"],"instructions":"string"}]},"safety_notes":["string"],"motivation_message":"string"}\n\n'
-        + 'Generate all ' + planWeeks + ' weeks with workouts only on ' + workoutDaysList.join(', ') + '. Generate ' + mealsPerDay + ' varied high-protein meals. Respond with ONLY the JSON object.';
+        + 'Generate ' + planWeeks + ' weeks, workouts ONLY on ' + workoutDaysList.join(', ') + '. Max 4 exercises per day. ' + mealsPerDay + ' meals total. Short notes. JSON only.';
     }
 
     const message = await anthropic.messages.create({
