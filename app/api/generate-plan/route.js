@@ -6,6 +6,14 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// Language instruction map — tells Claude what language to generate content in
+const LANGUAGE_INSTRUCTIONS = {
+  en: 'Generate ALL content in English.',
+  ar: 'Generate ALL meal names, ingredient names, exercise notes, workout names, and instructions in Arabic (العربية). Keep exercise names in English but translate notes and descriptions to Arabic.',
+  ku: 'Generate ALL meal names, ingredient names, exercise notes, workout names, and instructions in Kurdish Sorani (کوردی سۆرانی). Keep exercise names in English but translate notes and descriptions to Kurdish Sorani.',
+  tr: 'Generate ALL meal names, ingredient names, exercise notes, workout names, and instructions in Turkish (Türkçe). Keep exercise names in English but translate notes and descriptions to Turkish.',
+};
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -14,6 +22,10 @@ export async function POST(request) {
     if (!profile || !goal_type) {
       return NextResponse.json({ error: 'Missing profile or goal_type' }, { status: 400 });
     }
+
+    // Get language — from profile, body, or default to English
+    const language = body.language || profile.language || 'en';
+    const languageInstruction = LANGUAGE_INSTRUCTIONS[language] || LANGUAGE_INSTRUCTIONS.en;
 
     const weightKg = parseFloat(profile.starting_weight) || 80;
 
@@ -70,7 +82,9 @@ export async function POST(request) {
       const dailyCalories = Math.round(weightKg * 24 * 0.8);
       const proteinGrams = Math.round(weightKg * 1.8);
 
-      systemPrompt = 'You are an expert personal trainer specializing in fat loss. Respond with ONLY valid JSON. No markdown, no code fences, no extra text before or after the JSON.';
+      systemPrompt = 'You are an expert personal trainer specializing in fat loss. '
+        + languageInstruction
+        + ' Respond with ONLY valid JSON. No markdown, no code fences, no extra text before or after the JSON.';
 
       userPrompt = 'Create a ' + planWeeks + '-week weight loss plan.\n'
         + 'Name: ' + profile.full_name + '\n'
@@ -81,6 +95,7 @@ export async function POST(request) {
         + equipmentText + '\n'
         + scheduleText + '\n'
         + 'Daily calories: ' + dailyCalories + ', Protein: ' + proteinGrams + 'g\n\n'
+        + 'LANGUAGE REQUIREMENT: ' + languageInstruction + '\n\n'
         + 'CRITICAL REQUIREMENTS:\n'
         + '- Generate exactly ' + planWeeks + ' weeks of workouts\n'
         + '- Each week must have workouts ONLY on: ' + workoutDaysList.join(', ') + '\n'
@@ -88,15 +103,19 @@ export async function POST(request) {
         + '- Schedule workouts within the ' + workoutStart + ' to ' + workoutEnd + ' window\n'
         + '- Generate ' + mealsPerDay + ' meal suggestions total (one per day rotating)\n'
         + '- Progressive intensity increase each week\n\n'
-      + 'IMPORTANT: Keep exercise notes under 8 words. Keep meal instructions under 15 words. Be very concise.\n\n'
+        + 'IMPORTANT: Keep exercise notes under 8 words. Keep meal instructions under 15 words. Be very concise.\n'
+        + 'IMPORTANT: Day names in the JSON must stay in English (Monday, Tuesday etc) for system compatibility.\n\n'
         + 'Return ONLY valid JSON, no markdown, no code fences:\n'
         + '{"plan_type":"weight_loss","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":8000,"water_liters":2.5},"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"string","emoji":"string","type":"cardio","duration":"string","exercises":[{"name":"string","sets":"string","reps":"string","rest":"string","notes":"string"}]}]}]},"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"string","calories":0,"protein":"string","ingredients":["string"],"instructions":"string"}]},"safety_notes":["string"],"motivation_message":"string"}\n\n'
         + 'Generate ' + planWeeks + ' weeks, workouts ONLY on ' + workoutDaysList.join(', ') + '. Max 4 exercises per day. ' + mealsPerDay + ' meals total. Short notes. JSON only.';
+
     } else {
       const dailyCalories = Math.round(weightKg * 24 * 1.1);
       const proteinGrams = Math.round(weightKg * 2);
 
-      systemPrompt = 'You are an expert bodybuilding coach. Respond with ONLY valid JSON. No markdown, no code fences, no extra text before or after the JSON.';
+      systemPrompt = 'You are an expert bodybuilding coach. '
+        + languageInstruction
+        + ' Respond with ONLY valid JSON. No markdown, no code fences, no extra text before or after the JSON.';
 
       userPrompt = 'Create a ' + planWeeks + '-week bodybuilding plan.\n'
         + 'Name: ' + profile.full_name + '\n'
@@ -107,6 +126,7 @@ export async function POST(request) {
         + equipmentText + '\n'
         + scheduleText + '\n'
         + 'Daily calories: ' + dailyCalories + ', Protein: ' + proteinGrams + 'g\n\n'
+        + 'LANGUAGE REQUIREMENT: ' + languageInstruction + '\n\n'
         + 'CRITICAL REQUIREMENTS:\n'
         + '- Generate exactly ' + planWeeks + ' weeks of workouts\n'
         + '- Each week must have workouts ONLY on: ' + workoutDaysList.join(', ') + '\n'
@@ -115,7 +135,8 @@ export async function POST(request) {
         + '- Use Push/Pull/Legs/Upper split across the available workout days\n'
         + '- Generate ' + mealsPerDay + ' high-protein meal suggestions total\n'
         + '- Apply progressive overload in week 2 onwards\n\n'
-+ 'IMPORTANT: Keep exercise notes under 8 words. Keep meal instructions under 15 words. Be very concise.\n\n'
+        + 'IMPORTANT: Keep exercise notes under 8 words. Keep meal instructions under 15 words. Be very concise.\n'
+        + 'IMPORTANT: Day names in the JSON must stay in English (Monday, Tuesday etc) for system compatibility.\n\n'
         + 'Return ONLY valid JSON, no markdown, no code fences:\n'
         + '{"plan_type":"bodybuilding","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":6000,"water_liters":3.5},"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"string","emoji":"string","type":"strength","duration":"string","exercises":[{"name":"string","sets":"string","reps":"string","rest":"string","notes":"string"}]}]}]},"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"string","calories":0,"protein":"string","ingredients":["string"],"instructions":"string"}]},"safety_notes":["string"],"motivation_message":"string"}\n\n'
         + 'Generate ' + planWeeks + ' weeks, workouts ONLY on ' + workoutDaysList.join(', ') + '. Max 4 exercises per day. ' + mealsPerDay + ' meals total. Short notes. JSON only.';
@@ -130,7 +151,7 @@ export async function POST(request) {
 
     const rawText = message.content[0].text.trim();
 
-   let planData;
+    let planData;
     try {
       const jsonStart = rawText.indexOf('{');
       const jsonEnd = rawText.lastIndexOf('}');
@@ -157,6 +178,7 @@ export async function POST(request) {
         user_id: profile.user_id,
         plan_type: goal_type,
         plan_content: planData,
+        language: language,
       });
     }
 
