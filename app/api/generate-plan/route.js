@@ -81,17 +81,9 @@ const message = await anthropic.messages.create({
 
    let planData;
     try {
-      let cleaned = rawText;
-      cleaned = cleaned.replace(/^```json/i, '');
-      cleaned = cleaned.replace(/^```/i, '');
-      cleaned = cleaned.replace(/```$/i, '');
-      cleaned = cleaned.replace(/`/g, '');
-      cleaned = cleaned.trim();
-      const jsonStart = cleaned.indexOf('{');
-      const jsonEnd = cleaned.lastIndexOf('}');
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
-      }
+      const jsonStart = rawText.indexOf('{');
+      const jsonEnd = rawText.lastIndexOf('}');
+      const cleaned = rawText.substring(jsonStart, jsonEnd + 1);
       planData = JSON.parse(cleaned);
     } catch (e) {
       return NextResponse.json({ error: 'Failed to parse AI response', raw: rawText.substring(0, 200) }, { status: 500 });
