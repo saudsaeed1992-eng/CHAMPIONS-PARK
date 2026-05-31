@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import getClient from '@/lib/anthropic';
+import anthropic from '@/lib/anthropic';
 import supabaseServer from '@/lib/supabaseServer';
 
 export async function POST(request) {
@@ -21,6 +21,44 @@ export async function POST(request) {
       ? 'Available equipment: ' + profile.gym_equipment.join(', ') + '.'
       : 'Equipment: bodyweight only.';
 
+    const schedule = profile.schedule || {};
+    const workoutStart = schedule.workout_start || '07:00';
+    const workoutEnd = schedule.workout_end || '08:00';
+    const planStartDate = schedule.plan_start_date || new Date().toISOString().split('T')[0];
+    const planEndDate = schedule.plan_end_date || '';
+    const wakeTime = schedule.wake_time || '06:00';
+    const sleepTime = schedule.sleep_time || '23:00';
+    const workStart = schedule.work_start || '09:00';
+    const workEnd = schedule.work_end || '17:00';
+    const mealsPerDay = schedule.meals_per_day || '3';
+    const restDays = schedule.rest_days && schedule.rest_days.length > 0
+      ? schedule.rest_days.join(', ')
+      : 'Saturday, Sunday';
+    const dailyRoutine = schedule.daily_routine || '';
+    const notes = schedule.notes || '';
+
+    const planDays = planStartDate && planEndDate
+      ? Math.ceil((new Date(planEndDate) - new Date(planStartDate)) / (1000 * 60 * 60 * 24))
+      : 14;
+    const planWeeks = Math.max(2, Math.ceil(planDays / 7));
+
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const restDaysList = restDays.split(',').map(d => d.trim());
+    const workoutDaysList = daysOfWeek.filter(d => !restDaysList.includes(d));
+    const workoutDaysPerWeek = workoutDaysList.length;
+
+    const scheduleText = 'Schedule details:\n'
+      + '- Workout time window: ' + workoutStart + ' to ' + workoutEnd + '\n'
+      + '- Plan duration: ' + planStartDate + ' to ' + (planEndDate || 'ongoing') + ' (' + planDays + ' days / ' + planWeeks + ' weeks)\n'
+      + '- Wake up time: ' + wakeTime + '\n'
+      + '- Sleep time: ' + sleepTime + '\n'
+      + '- Work/school hours: ' + workStart + ' to ' + workEnd + '\n'
+      + '- Meals per day: ' + mealsPerDay + '\n'
+      + '- Rest days: ' + restDays + '\n'
+      + '- Workout days: ' + workoutDaysList.join(', ') + ' (' + workoutDaysPerWeek + ' days per week)\n'
+      + (dailyRoutine ? '- Daily routine: ' + dailyRoutine + '\n' : '')
+      + (notes ? '- Additional notes: ' + notes + '\n' : '');
+
     let systemPrompt = '';
     let userPrompt = '';
 
@@ -28,49 +66,57 @@ export async function POST(request) {
       const dailyCalories = Math.round(weightKg * 24 * 0.8);
       const proteinGrams = Math.round(weightKg * 1.8);
 
-      systemPrompt = 'You are an expert personal trainer specializing in fat loss. Respond with ONLY valid JSON. No markdown, no code fences, no extra text.';
+      systemPrompt = 'You are an expert personal trainer specializing in fat loss. Respond with ONLY valid JSON. No markdown, no code fences, no extra text before or after the JSON.';
 
-      userPrompt = 'Create a 2-week weight loss plan.\n'
+      userPrompt = 'Create a ' + planWeeks + '-week weight loss plan.\n'
         + 'Name: ' + profile.full_name + '\n'
         + 'Age: ' + profile.age + '\n'
         + 'Gender: ' + profile.gender + '\n'
-        + 'Weight: ' + weightKg + 'kg\n'
-        + 'Target: ' + profile.target_weight + 'kg\n'
-        + 'Height: ' + profile.height_cm + 'cm\n'
+        + 'Weight: ' + weightKg + 'kg, Target: ' + profile.target_weight + 'kg, Height: ' + profile.height_cm + 'cm\n'
         + injuriesText + '\n'
         + equipmentText + '\n'
-        + '3 workout days per week, cardio-focused.\n'
-        + 'Daily calories: ' + dailyCalories + '\n'
-        + 'Daily protein: ' + proteinGrams + 'g\n'
-        + 'Return ONLY valid JSON with this structure:\n'
-        + '{"plan_type":"weight_loss","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":3,"daily_steps":8000,"water_liters":2.5},"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"string","emoji":"string","type":"cardio","duration":"string","exercises":[{"name":"string","sets":"string","reps":"string","rest":"string","notes":"string"}]}]},{"week":2,"days":[]}]},"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"string","calories":0,"protein":"string","ingredients":["string"],"instructions":"string"}]},"safety_notes":["string"],"motivation_message":"string"}\n'
-        + 'Generate 3 workout days for week 1, 3 for week 2, and 7 meals. Respond with ONLY the JSON.';
+        + scheduleText + '\n'
+        + 'Daily calories: ' + dailyCalories + ', Protein: ' + proteinGrams + 'g\n\n'
+        + 'CRITICAL REQUIREMENTS:\n'
+        + '- Generate exactly ' + planWeeks + ' weeks of workouts\n'
+        + '- Each week must have workouts ONLY on: ' + workoutDaysList.join(', ') + '\n'
+        + '- NO workouts on rest days: ' + restDays + '\n'
+        + '- Schedule workouts within the ' + workoutStart + ' to ' + workoutEnd + ' window\n'
+        + '- Generate ' + mealsPerDay + ' meal suggestions total (one per day rotating)\n'
+        + '- Progressive intensity increase each week\n\n'
+        + 'Return ONLY this JSON structure, no other text:\n'
+        + '{"plan_type":"weight_loss","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":8000,"water_liters":2.5},"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"string","emoji":"string","type":"cardio","duration":"string","exercises":[{"name":"string","sets":"string","reps":"string","rest":"string","notes":"string"}]}]}]},"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"string","calories":0,"protein":"string","ingredients":["string"],"instructions":"string"}]},"safety_notes":["string"],"motivation_message":"string"}\n\n'
+        + 'Generate all ' + planWeeks + ' weeks with workouts only on ' + workoutDaysList.join(', ') + '. Generate ' + mealsPerDay + ' varied meals. Respond with ONLY the JSON object.';
 
     } else {
       const dailyCalories = Math.round(weightKg * 24 * 1.1);
       const proteinGrams = Math.round(weightKg * 2);
 
-      systemPrompt = 'You are an expert bodybuilding coach. Respond with ONLY valid JSON. No markdown, no code fences, no extra text.';
+      systemPrompt = 'You are an expert bodybuilding coach. Respond with ONLY valid JSON. No markdown, no code fences, no extra text before or after the JSON.';
 
-      userPrompt = 'Create a 2-week bodybuilding plan.\n'
+      userPrompt = 'Create a ' + planWeeks + '-week bodybuilding plan.\n'
         + 'Name: ' + profile.full_name + '\n'
         + 'Age: ' + profile.age + '\n'
         + 'Gender: ' + profile.gender + '\n'
-        + 'Weight: ' + weightKg + 'kg\n'
-        + 'Target: ' + profile.target_weight + 'kg\n'
-        + 'Height: ' + profile.height_cm + 'cm\n'
+        + 'Weight: ' + weightKg + 'kg, Target: ' + profile.target_weight + 'kg, Height: ' + profile.height_cm + 'cm\n'
         + injuriesText + '\n'
         + equipmentText + '\n'
-        + '4 workout days per week, Push/Pull/Legs/Upper split.\n'
-        + 'Daily calories: ' + dailyCalories + '\n'
-        + 'Daily protein: ' + proteinGrams + 'g\n'
-        + 'Return ONLY valid JSON with this structure:\n'
-        + '{"plan_type":"bodybuilding","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":4,"daily_steps":6000,"water_liters":3.5},"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"string","emoji":"string","type":"strength","duration":"string","exercises":[{"name":"string","sets":"string","reps":"string","rest":"string","notes":"string"}]}]},{"week":2,"days":[]}]},"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"string","calories":0,"protein":"string","ingredients":["string"],"instructions":"string"}]},"safety_notes":["string"],"motivation_message":"string"}\n'
-        + 'Generate 4 workout days for week 1, 4 for week 2 with progressive overload, and 7 meals. Respond with ONLY the JSON.';
+        + scheduleText + '\n'
+        + 'Daily calories: ' + dailyCalories + ', Protein: ' + proteinGrams + 'g\n\n'
+        + 'CRITICAL REQUIREMENTS:\n'
+        + '- Generate exactly ' + planWeeks + ' weeks of workouts\n'
+        + '- Each week must have workouts ONLY on: ' + workoutDaysList.join(', ') + '\n'
+        + '- NO workouts on rest days: ' + restDays + '\n'
+        + '- Schedule workouts within the ' + workoutStart + ' to ' + workoutEnd + ' window\n'
+        + '- Use Push/Pull/Legs/Upper split across the available workout days\n'
+        + '- Generate ' + mealsPerDay + ' high-protein meal suggestions total\n'
+        + '- Apply progressive overload in week 2 onwards\n\n'
+        + 'Return ONLY this JSON structure, no other text:\n'
+        + '{"plan_type":"bodybuilding","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":6000,"water_liters":3.5},"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"string","emoji":"string","type":"strength","duration":"string","exercises":[{"name":"string","sets":"string","reps":"string","rest":"string","notes":"string"}]}]}]},"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"string","calories":0,"protein":"string","ingredients":["string"],"instructions":"string"}]},"safety_notes":["string"],"motivation_message":"string"}\n\n'
+        + 'Generate all ' + planWeeks + ' weeks with workouts only on ' + workoutDaysList.join(', ') + '. Generate ' + mealsPerDay + ' varied high-protein meals. Respond with ONLY the JSON object.';
     }
 
-    const anthropic = getClient();
-const message = await anthropic.messages.create({
+    const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 4000,
       system: systemPrompt,
@@ -79,7 +125,7 @@ const message = await anthropic.messages.create({
 
     const rawText = message.content[0].text.trim();
 
-   let planData;
+    let planData;
     try {
       const jsonStart = rawText.indexOf('{');
       const jsonEnd = rawText.lastIndexOf('}');
