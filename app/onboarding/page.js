@@ -11,21 +11,30 @@ export default function OnboardingPage() {
   const [user, setUser] = useState(null);
 
   const [profile, setProfile] = useState({
-    full_name: '',
-    age: '',
-    gender: '',
-    starting_weight: '',
-    target_weight: '',
-    height_cm: '',
-    injuries: '',
+    full_name: '', age: '', gender: '',
+    starting_weight: '', target_weight: '', height_cm: '', injuries: '',
   });
 
   const [equipment, setEquipment] = useState([]);
   const [gymPhoto, setGymPhoto] = useState(null);
   const [gymPhotoPreview, setGymPhotoPreview] = useState(null);
-
   const [photos, setPhotos] = useState({ front: null, back: null, left: null, right: null });
   const [photoPreviews, setPhotoPreviews] = useState({ front: null, back: null, left: null, right: null });
+
+  const [schedule, setSchedule] = useState({
+    workout_start: '07:00',
+    workout_end: '08:00',
+    plan_start_date: new Date().toISOString().split('T')[0],
+    plan_end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    wake_time: '06:00',
+    sleep_time: '23:00',
+    work_start: '09:00',
+    work_end: '17:00',
+    meals_per_day: '3',
+    rest_days: [],
+    daily_routine: '',
+    notes: '',
+  });
 
   const equipmentOptions = [
     { id: 'treadmill', label: '🏃 Treadmill' },
@@ -45,6 +54,8 @@ export default function OnboardingPage() {
     { id: 'none', label: '🚫 No Equipment' },
   ];
 
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -62,6 +73,15 @@ export default function OnboardingPage() {
       const without = prev.filter(e => e !== 'none');
       return without.includes(id) ? without.filter(e => e !== id) : [...without, id];
     });
+  };
+
+  const toggleRestDay = (day) => {
+    setSchedule(prev => ({
+      ...prev,
+      rest_days: prev.rest_days.includes(day)
+        ? prev.rest_days.filter(d => d !== day)
+        : [...prev.rest_days, day],
+    }));
   };
 
   const handlePhotoChange = (type, file) => {
@@ -108,10 +128,7 @@ export default function OnboardingPage() {
 
       const { data: { session } } = await supabase.auth.getSession();
       const goalType = session.user.user_metadata?.goal_type || 'weight_loss';
-
-      const { count } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
+      const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
 
       await supabase.from('profiles').upsert({
         id: user.id,
@@ -131,7 +148,12 @@ export default function OnboardingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profile: { ...profile, user_id: user.id, gym_equipment: equipment },
+          profile: {
+            ...profile,
+            user_id: user.id,
+            gym_equipment: equipment,
+            schedule: schedule,
+          },
           goal_type: goalType,
         }),
       });
@@ -147,11 +169,11 @@ export default function OnboardingPage() {
   };
 
   const inputStyle = {
-    width: '100%', padding: '12px 14px',
+    width: '100%', padding: '11px 14px',
     background: '#FDFCFA',
     border: '1.5px solid rgba(134,168,134,0.35)',
     borderRadius: '10px', color: '#1B3A2A',
-    fontSize: '15px', fontFamily: 'inherit',
+    fontSize: '14px', fontFamily: 'inherit',
     boxSizing: 'border-box',
   };
 
@@ -159,7 +181,14 @@ export default function OnboardingPage() {
     display: 'block', fontSize: '11px',
     fontWeight: '600', letterSpacing: '1px',
     textTransform: 'uppercase', color: '#5A7A5A',
-    marginBottom: '6px',
+    marginBottom: '5px',
+  };
+
+  const sectionStyle = {
+    background: 'rgba(232,245,233,0.5)',
+    border: '1px solid rgba(134,168,134,0.25)',
+    borderRadius: '12px', padding: '16px',
+    marginBottom: '16px',
   };
 
   const photoTypes = [
@@ -168,6 +197,8 @@ export default function OnboardingPage() {
     { key: 'left', label: '📸 Left Side' },
     { key: 'right', label: '📸 Right Side' },
   ];
+
+  const totalPhotos = Object.values(photos).filter(Boolean).length;
 
   return (
     <div style={{
@@ -179,16 +210,26 @@ export default function OnboardingPage() {
       {generating && (
         <div style={{
           position: 'fixed', inset: 0,
-          background: 'rgba(27,58,42,0.88)',
+          background: 'rgba(27,58,42,0.9)',
           zIndex: 1000, display: 'flex',
           flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', gap: '16px',
         }}>
-          <div style={{ fontSize: '48px' }}>🤖</div>
-          <div style={{ fontSize: '22px', fontWeight: '700', color: '#FDFCFA' }}>Claude is building your plan...</div>
-          <div style={{ fontSize: '14px', color: 'rgba(253,252,250,0.7)' }}>Analyzing your profile and generating a personalized program</div>
-          <div style={{ width: '200px', height: '4px', background: 'rgba(255,255,255,0.2)', borderRadius: '2px', overflow: 'hidden', marginTop: '8px' }}>
-            <div style={{ height: '100%', width: '60%', background: '#86A886', borderRadius: '2px', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          <div style={{ fontSize: '52px' }}>🤖</div>
+          <div style={{ fontSize: '22px', fontWeight: '700', color: '#FDFCFA', fontFamily: 'Georgia, serif' }}>
+            Claude is building your plan...
+          </div>
+          <div style={{ fontSize: '14px', color: 'rgba(253,252,250,0.7)', textAlign: 'center', maxWidth: '300px', lineHeight: '1.6' }}>
+            Analyzing your profile, schedule and daily routine to create your perfect personalized program
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{
+                width: '10px', height: '10px', borderRadius: '50%',
+                background: '#86A886',
+                animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+              }} />
+            ))}
           </div>
         </div>
       )}
@@ -196,23 +237,38 @@ export default function OnboardingPage() {
       <div style={{ maxWidth: '580px', margin: '0 auto' }}>
 
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '6px' }}>🏆</div>
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', color: '#1B3A2A', marginBottom: '4px' }}>Champions Park</h1>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <div style={{ fontSize: '30px', marginBottom: '4px' }}>🏆</div>
+          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '24px', color: '#1B3A2A', margin: 0 }}>Champions Park</h1>
         </div>
 
-        {/* Progress bar */}
-        <div style={{ marginBottom: '28px', textAlign: 'center' }}>
-          <div style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '10px', fontWeight: '500' }}>
-            Step {step} of 3
+        {/* Progress */}
+        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
+          <div style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px', fontWeight: '500' }}>
+            Step {step} of 4
           </div>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            {[1, 2, 3].map(s => (
+            {[1, 2, 3, 4].map(s => (
               <div key={s} style={{
-                height: '5px', width: '90px', borderRadius: '3px',
-                background: s <= step ? '#4A7A4A' : 'rgba(134,168,134,0.3)',
+                height: '5px', width: '70px', borderRadius: '3px',
+                background: s <= step ? '#2D5A2D' : 'rgba(134,168,134,0.3)',
                 transition: 'background 0.3s',
               }} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '8px' }}>
+            {[
+              { n: 1, label: 'Profile' },
+              { n: 2, label: 'Equipment' },
+              { n: 3, label: 'Photos' },
+              { n: 4, label: 'Schedule' },
+            ].map(({ n, label }) => (
+              <div key={n} style={{
+                fontSize: '10px', fontWeight: '600',
+                color: step === n ? '#2D5A2D' : '#86A886',
+                width: '70px', textAlign: 'center',
+                textTransform: 'uppercase', letterSpacing: '0.5px',
+              }}>{label}</div>
             ))}
           </div>
         </div>
@@ -222,17 +278,17 @@ export default function OnboardingPage() {
           border: '1px solid rgba(134,168,134,0.3)',
           borderRadius: '18px',
           boxShadow: '0 8px 32px rgba(27,58,42,0.1)',
-          padding: '32px',
+          padding: '28px',
         }}>
 
-          {/* STEP 1 — Body Profile */}
+          {/* ── STEP 1: BODY PROFILE ── */}
           {step === 1 && (
             <div>
-              <h2 style={{ fontSize: '22px', color: '#1B3A2A', marginBottom: '6px' }}>Your Body Profile</h2>
-              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '24px', fontStyle: 'italic' }}>
+              <h2 style={{ fontSize: '20px', color: '#1B3A2A', marginBottom: '4px' }}>Your Body Profile</h2>
+              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '20px', fontStyle: 'italic' }}>
                 Tell us about yourself so Claude can personalize your plan
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Full Name</label>
                   <input style={inputStyle} value={profile.full_name} onChange={e => setProfile({ ...profile, full_name: e.target.value })} placeholder="John Champion" />
@@ -245,9 +301,9 @@ export default function OnboardingPage() {
                   <label style={labelStyle}>Gender</label>
                   <select style={inputStyle} value={profile.gender} onChange={e => setProfile({ ...profile, gender: e.target.value })}>
                     <option value="">Select...</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
+                    <option>Male</option>
+                    <option>Female</option>
+                    <option>Other</option>
                   </select>
                 </div>
                 <div>
@@ -264,145 +320,94 @@ export default function OnboardingPage() {
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Injuries or Limitations</label>
-                  <textarea style={{ ...inputStyle, height: '80px', resize: 'vertical' }} value={profile.injuries} onChange={e => setProfile({ ...profile, injuries: e.target.value })} placeholder="e.g. bad knees, lower back pain — or leave blank" />
+                  <textarea style={{ ...inputStyle, height: '70px', resize: 'vertical' }} value={profile.injuries} onChange={e => setProfile({ ...profile, injuries: e.target.value })} placeholder="e.g. bad knees, lower back pain — or leave blank" />
                 </div>
               </div>
-              <button onClick={() => setStep(2)} style={{
-                width: '100%', marginTop: '24px', padding: '14px',
-                background: '#2D5A2D', border: 'none', borderRadius: '12px',
-                color: '#FDFCFA', fontSize: '15px', fontWeight: '700',
-                cursor: 'pointer', fontFamily: 'inherit',
-              }}>
+              <button onClick={() => setStep(2)} style={{ width: '100%', marginTop: '20px', padding: '13px', background: '#2D5A2D', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '15px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
                 Continue → Equipment 💪
               </button>
             </div>
           )}
 
-          {/* STEP 2 — Equipment */}
+          {/* ── STEP 2: EQUIPMENT ── */}
           {step === 2 && (
             <div>
-              <h2 style={{ fontSize: '22px', color: '#1B3A2A', marginBottom: '6px' }}>Your Equipment</h2>
-              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '20px', fontStyle: 'italic' }}>
-                Select your equipment OR upload a photo of your gym
-              </p>
+              <h2 style={{ fontSize: '20px', color: '#1B3A2A', marginBottom: '4px' }}>Your Equipment</h2>
+              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '16px', fontStyle: 'italic' }}>Select your equipment OR upload a gym photo</p>
 
-              {/* Equipment checkboxes */}
-              <div style={{
-                fontSize: '11px', fontWeight: '600', letterSpacing: '1px',
-                textTransform: 'uppercase', color: '#5A7A5A', marginBottom: '10px',
-              }}>
-                Option A — Select Equipment
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', textTransform: 'uppercase', color: '#5A7A5A', marginBottom: '8px' }}>Option A — Select Equipment</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', marginBottom: '16px' }}>
                 {equipmentOptions.map(opt => (
                   <label key={opt.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                    padding: '11px 12px',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '10px 12px',
                     background: equipment.includes(opt.id) ? 'rgba(45,90,45,0.08)' : '#FDFCFA',
                     border: `1.5px solid ${equipment.includes(opt.id) ? '#2D5A2D' : 'rgba(134,168,134,0.35)'}`,
                     borderRadius: '10px', cursor: 'pointer',
                     fontSize: '13px', fontWeight: '500', color: '#1B3A2A',
                     transition: 'all 0.2s',
                   }}>
-                    <input
-                      type="checkbox"
-                      checked={equipment.includes(opt.id)}
-                      onChange={() => toggleEquipment(opt.id)}
-                      style={{ accentColor: '#2D5A2D', width: '16px', height: '16px' }}
-                    />
+                    <input type="checkbox" checked={equipment.includes(opt.id)} onChange={() => toggleEquipment(opt.id)} style={{ accentColor: '#2D5A2D', width: '15px', height: '15px' }} />
                     {opt.label}
                   </label>
                 ))}
               </div>
 
-              {/* Gym photo upload */}
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{
-                  fontSize: '11px', fontWeight: '600', letterSpacing: '1px',
-                  textTransform: 'uppercase', color: '#5A7A5A', marginBottom: '10px',
-                }}>
-                  Option B — Upload Gym / Equipment Photo
-                </div>
-                <label style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  justifyContent: 'center', gap: '10px', padding: '20px',
-                  background: gymPhotoPreview ? 'transparent' : 'rgba(134,168,134,0.08)',
-                  border: `2px dashed ${gymPhoto ? '#2D5A2D' : 'rgba(134,168,134,0.4)'}`,
-                  borderRadius: '12px', cursor: 'pointer', minHeight: '120px',
-                  overflow: 'hidden',
-                }}>
-                  <input type="file" accept="image/*" onChange={e => handleGymPhotoChange(e.target.files[0])} style={{ display: 'none' }} />
-                  {gymPhotoPreview ? (
-                    <img src={gymPhotoPreview} alt="gym" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }} />
-                  ) : (
-                    <>
-                      <span style={{ fontSize: '32px' }}>📷</span>
-                      <span style={{ fontSize: '13px', color: '#5A7A5A', textAlign: 'center' }}>
-                        Click to upload a photo of your gym or equipment
-                      </span>
-                      <span style={{ fontSize: '11px', color: '#86A886' }}>JPG, PNG or WebP • Max 10MB</span>
-                    </>
-                  )}
-                </label>
-              </div>
+              <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', textTransform: 'uppercase', color: '#5A7A5A', marginBottom: '8px' }}>Option B — Upload Gym Photo</div>
+              <label style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '8px', padding: '18px',
+                background: gymPhotoPreview ? 'transparent' : 'rgba(134,168,134,0.06)',
+                border: `2px dashed ${gymPhoto ? '#2D5A2D' : 'rgba(134,168,134,0.4)'}`,
+                borderRadius: '12px', cursor: 'pointer', minHeight: '100px', overflow: 'hidden',
+                marginBottom: '20px',
+              }}>
+                <input type="file" accept="image/*" onChange={e => handleGymPhotoChange(e.target.files[0])} style={{ display: 'none' }} />
+                {gymPhotoPreview ? (
+                  <img src={gymPhotoPreview} alt="gym" style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px' }} />
+                ) : (
+                  <>
+                    <span style={{ fontSize: '28px' }}>📷</span>
+                    <span style={{ fontSize: '13px', color: '#5A7A5A', textAlign: 'center' }}>Click to upload gym or equipment photo</span>
+                  </>
+                )}
+              </label>
 
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setStep(1)} style={{
-                  flex: 1, padding: '14px', background: 'transparent',
-                  border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '12px',
-                  color: '#1B3A2A', fontSize: '15px', fontWeight: '600',
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}>← Back</button>
-                <button onClick={() => setStep(3)} style={{
-                  flex: 2, padding: '14px', background: '#2D5A2D',
-                  border: 'none', borderRadius: '12px', color: '#FDFCFA',
-                  fontSize: '15px', fontWeight: '700', cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}>Continue → Photos 📸</button>
+                <button onClick={() => setStep(1)} style={{ flex: 1, padding: '13px', background: 'transparent', border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '12px', color: '#1B3A2A', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>← Back</button>
+                <button onClick={() => setStep(3)} style={{ flex: 2, padding: '13px', background: '#2D5A2D', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>Continue → Photos 📸</button>
               </div>
             </div>
           )}
 
-          {/* STEP 3 — 4 Body Photos */}
+          {/* ── STEP 3: 4 BODY PHOTOS ── */}
           {step === 3 && (
             <div>
-              <h2 style={{ fontSize: '22px', color: '#1B3A2A', marginBottom: '6px' }}>Starting Photos</h2>
-              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px', fontStyle: 'italic' }}>
-                Upload all 4 photos for a better personalized plan
-              </p>
-              <div style={{
-                background: 'rgba(45,90,45,0.06)', border: '1px solid rgba(45,90,45,0.15)',
-                borderRadius: '10px', padding: '10px 14px', marginBottom: '20px',
-                fontSize: '12px', color: '#2D5A2D',
-              }}>
+              <h2 style={{ fontSize: '20px', color: '#1B3A2A', marginBottom: '4px' }}>Starting Photos</h2>
+              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px', fontStyle: 'italic' }}>Upload all 4 angles for a better plan</p>
+              <div style={{ background: 'rgba(45,90,45,0.06)', border: '1px solid rgba(45,90,45,0.15)', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', fontSize: '12px', color: '#2D5A2D' }}>
                 💡 4 angles help Claude design a more accurate and balanced workout plan
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
                 {photoTypes.map(({ key, label }) => (
                   <label key={key} style={{
-                    display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center',
-                    gap: '8px', padding: '16px 8px',
-                    background: photoPreviews[key] ? 'transparent' : 'rgba(134,168,134,0.08)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: '6px', padding: '14px 8px',
+                    background: photoPreviews[key] ? 'transparent' : 'rgba(134,168,134,0.06)',
                     border: `2px dashed ${photos[key] ? '#2D5A2D' : 'rgba(134,168,134,0.4)'}`,
-                    borderRadius: '12px', cursor: 'pointer',
-                    minHeight: '130px', overflow: 'hidden',
+                    borderRadius: '12px', cursor: 'pointer', minHeight: '120px', overflow: 'hidden',
                     transition: 'all 0.2s',
                   }}>
-                    <input
-                      type="file" accept="image/*"
-                      onChange={e => handlePhotoChange(key, e.target.files[0])}
-                      style={{ display: 'none' }}
-                    />
+                    <input type="file" accept="image/*" onChange={e => handlePhotoChange(key, e.target.files[0])} style={{ display: 'none' }} />
                     {photoPreviews[key] ? (
                       <>
-                        <img src={photoPreviews[key]} alt={key} style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '8px' }} />
+                        <img src={photoPreviews[key]} alt={key} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px' }} />
                         <span style={{ fontSize: '11px', color: '#2D5A2D', fontWeight: '600' }}>✓ {label}</span>
                       </>
                     ) : (
                       <>
-                        <span style={{ fontSize: '28px' }}>📷</span>
+                        <span style={{ fontSize: '26px' }}>📷</span>
                         <span style={{ fontSize: '12px', color: '#5A7A5A', fontWeight: '600', textAlign: 'center' }}>{label}</span>
                         <span style={{ fontSize: '10px', color: '#86A886' }}>Tap to upload</span>
                       </>
@@ -411,41 +416,164 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              {/* Progress indicator */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', justifyContent: 'center' }}>
-                {photoTypes.map(({ key, label }) => (
-                  <div key={key} style={{
-                    display: 'flex', alignItems: 'center', gap: '4px',
-                    fontSize: '11px',
-                    color: photos[key] ? '#2D5A2D' : '#86A886',
-                    fontWeight: photos[key] ? '600' : '400',
-                  }}>
-                    <span>{photos[key] ? '✅' : '⬜'}</span>
-                    <span>{key}</span>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
+                {photoTypes.map(({ key }) => (
+                  <div key={key} style={{ fontSize: '11px', color: photos[key] ? '#2D5A2D' : '#86A886', fontWeight: photos[key] ? '600' : '400' }}>
+                    {photos[key] ? '✅' : '⬜'} {key}
                   </div>
                 ))}
               </div>
 
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setStep(2)} style={{
-                  flex: 1, padding: '14px', background: 'transparent',
-                  border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '12px',
-                  color: '#1B3A2A', fontSize: '15px', fontWeight: '600',
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}>← Back</button>
-                <button onClick={handleGenerate} style={{
-                  flex: 2, padding: '14px',
-                  background: Object.values(photos).every(Boolean) ? '#C9922A' : 'rgba(134,168,134,0.4)',
-                  border: 'none', borderRadius: '12px', color: '#FDFCFA',
-                  fontSize: '15px', fontWeight: '700', cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  transition: 'all 0.3s',
-                }}>
-                  {Object.values(photos).every(Boolean) ? '✨ Generate My Free Plan' : `Upload ${4 - Object.values(photos).filter(Boolean).length} more photo(s)`}
+                <button onClick={() => setStep(2)} style={{ flex: 1, padding: '13px', background: 'transparent', border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '12px', color: '#1B3A2A', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>← Back</button>
+                <button onClick={() => setStep(4)} disabled={totalPhotos < 4} style={{ flex: 2, padding: '13px', background: totalPhotos === 4 ? '#2D5A2D' : 'rgba(134,168,134,0.3)', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '14px', fontWeight: '700', cursor: totalPhotos === 4 ? 'pointer' : 'not-allowed', fontFamily: 'inherit', transition: 'all 0.3s' }}>
+                  {totalPhotos === 4 ? 'Continue → Schedule ⏰' : `Upload ${4 - totalPhotos} more photo(s)`}
                 </button>
               </div>
             </div>
           )}
+
+          {/* ── STEP 4: SCHEDULE & ROUTINE ── */}
+          {step === 4 && (
+            <div>
+              <h2 style={{ fontSize: '20px', color: '#1B3A2A', marginBottom: '4px' }}>Your Schedule & Routine</h2>
+              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '20px', fontStyle: 'italic' }}>
+                Help Claude build a plan that fits your real life
+              </p>
+
+              {/* Workout Hours */}
+              <div style={sectionStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '18px' }}>⏰</span>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>Daily Workout Window</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={labelStyle}>Workout Start Time</label>
+                    <input type="time" style={inputStyle} value={schedule.workout_start} onChange={e => setSchedule({ ...schedule, workout_start: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Workout End Time</label>
+                    <input type="time" style={inputStyle} value={schedule.workout_end} onChange={e => setSchedule({ ...schedule, workout_end: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Plan Duration */}
+              <div style={sectionStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '18px' }}>📅</span>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>Plan Duration</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={labelStyle}>Start Date</label>
+                    <input type="date" style={inputStyle} value={schedule.plan_start_date} onChange={e => setSchedule({ ...schedule, plan_start_date: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>End Date</label>
+                    <input type="date" style={inputStyle} value={schedule.plan_end_date} onChange={e => setSchedule({ ...schedule, plan_end_date: e.target.value })} />
+                  </div>
+                </div>
+                <div style={{ marginTop: '8px', fontSize: '12px', color: '#5A7A5A', fontStyle: 'italic' }}>
+                  {schedule.plan_start_date && schedule.plan_end_date
+                    ? `📆 ${Math.ceil((new Date(schedule.plan_end_date) - new Date(schedule.plan_start_date)) / (1000 * 60 * 60 * 24))} days total`
+                    : 'Select start and end dates'}
+                </div>
+              </div>
+
+              {/* Daily Routine */}
+              <div style={sectionStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '18px' }}>🌅</span>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>Daily Routine</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div>
+                    <label style={labelStyle}>Wake Up Time</label>
+                    <input type="time" style={inputStyle} value={schedule.wake_time} onChange={e => setSchedule({ ...schedule, wake_time: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Sleep Time</label>
+                    <input type="time" style={inputStyle} value={schedule.sleep_time} onChange={e => setSchedule({ ...schedule, sleep_time: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Work / School Start</label>
+                    <input type="time" style={inputStyle} value={schedule.work_start} onChange={e => setSchedule({ ...schedule, work_start: e.target.value })} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Work / School End</label>
+                    <input type="time" style={inputStyle} value={schedule.work_end} onChange={e => setSchedule({ ...schedule, work_end: e.target.value })} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={labelStyle}>Meals Per Day</label>
+                  <select style={inputStyle} value={schedule.meals_per_day} onChange={e => setSchedule({ ...schedule, meals_per_day: e.target.value })}>
+                    <option value="2">2 meals</option>
+                    <option value="3">3 meals</option>
+                    <option value="4">4 meals</option>
+                    <option value="5">5 meals</option>
+                    <option value="6">6 meals (bodybuilder)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Rest Days */}
+              <div style={sectionStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '18px' }}>😴</span>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>Preferred Rest Days</div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {daysOfWeek.map(day => (
+                    <button key={day} type="button" onClick={() => toggleRestDay(day)} style={{
+                      padding: '6px 14px', borderRadius: '20px', border: 'none',
+                      background: schedule.rest_days.includes(day) ? '#2D5A2D' : 'rgba(134,168,134,0.2)',
+                      color: schedule.rest_days.includes(day) ? '#FDFCFA' : '#2D5A2D',
+                      fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                      fontFamily: 'inherit', transition: 'all 0.2s',
+                    }}>
+                      {day.substring(0, 3)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Additional Notes */}
+              <div style={sectionStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '18px' }}>📝</span>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>General Daily Routine & Notes</div>
+                </div>
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={labelStyle}>Describe Your Daily Routine</label>
+                  <textarea
+                    style={{ ...inputStyle, height: '90px', resize: 'vertical' }}
+                    value={schedule.daily_routine}
+                    onChange={e => setSchedule({ ...schedule, daily_routine: e.target.value })}
+                    placeholder="e.g. I wake at 6am, drop kids at school at 8am, work 9-5, usually tired by 8pm. I prefer morning workouts before work. I cook at home most days but eat out on weekends..."
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Any Other Notes for Claude</label>
+                  <textarea
+                    style={{ ...inputStyle, height: '70px', resize: 'vertical' }}
+                    value={schedule.notes}
+                    onChange={e => setSchedule({ ...schedule, notes: e.target.value })}
+                    placeholder="e.g. I travel for work on Tuesdays, I fast until noon, I have a gym partner on Fridays only..."
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setStep(3)} style={{ flex: 1, padding: '13px', background: 'transparent', border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '12px', color: '#1B3A2A', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>← Back</button>
+                <button onClick={handleGenerate} style={{ flex: 2, padding: '13px', background: '#C9922A', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '15px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 16px rgba(201,146,42,0.3)' }}>
+                  ✨ Generate My Free Plan
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
