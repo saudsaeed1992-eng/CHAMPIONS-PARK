@@ -122,21 +122,33 @@ export async function POST(request) {
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 4000,
+      max_tokens: 8000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     });
 
     const rawText = message.content[0].text.trim();
 
-    let planData;
+   let planData;
     try {
       const jsonStart = rawText.indexOf('{');
       const jsonEnd = rawText.lastIndexOf('}');
+      if (jsonStart === -1 || jsonEnd === -1) {
+        throw new Error('No JSON found in response');
+      }
       const cleaned = rawText.substring(jsonStart, jsonEnd + 1);
       planData = JSON.parse(cleaned);
     } catch (e) {
-      return NextResponse.json({ error: 'Failed to parse AI response', raw: rawText.substring(0, 200) }, { status: 500 });
+      try {
+        const lines = rawText.split('\n');
+        const jsonLines = lines.filter(l => !l.startsWith('```'));
+        const joined = jsonLines.join('\n');
+        const s = joined.indexOf('{');
+        const en = joined.lastIndexOf('}');
+        planData = JSON.parse(joined.substring(s, en + 1));
+      } catch (e2) {
+        return NextResponse.json({ error: 'Failed to parse AI response', raw: rawText.substring(0, 200) }, { status: 500 });
+      }
     }
 
     if (profile.user_id) {
