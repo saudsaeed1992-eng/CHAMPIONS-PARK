@@ -122,8 +122,9 @@ export default function OnboardingPage() {
       });
 
       const data = await res.json();
+      console.log('Plan response:', data);
       if (data.success) { router.push('/dashboard'); }
-      else { alert('Error generating plan. Please try again.'); }
+      else { alert('Error: ' + JSON.stringify(data)); }
     } catch (err) {
       alert('Something went wrong: ' + err.message);
     } finally {
