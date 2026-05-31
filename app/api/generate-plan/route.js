@@ -79,19 +79,22 @@ const message = await anthropic.messages.create({
 
     const rawText = message.content[0].text.trim();
 
-    let planData;
+   let planData;
     try {
-      const cleaned = rawText
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .trim();
+      let cleaned = rawText;
+      cleaned = cleaned.replace(/^```json/i, '');
+      cleaned = cleaned.replace(/^```/i, '');
+      cleaned = cleaned.replace(/```$/i, '');
+      cleaned = cleaned.replace(/`/g, '');
+      cleaned = cleaned.trim();
+      const jsonStart = cleaned.indexOf('{');
+      const jsonEnd = cleaned.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+      }
       planData = JSON.parse(cleaned);
     } catch (e) {
-      return NextResponse.json(
-        { error: 'Failed to parse AI response', raw: rawText.substring(0, 200) },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to parse AI response', raw: rawText.substring(0, 200) }, { status: 500 });
     }
 
     if (profile.user_id) {
