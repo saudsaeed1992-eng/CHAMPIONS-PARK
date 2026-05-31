@@ -1,0 +1,22 @@
+<svg width="200" height="200" viewBox="0 0 680 320" role="img" xmlns="http://www.w3.org/2000/svg">
+  <path d="M340 30 L440 55 L460 160 Q460 230 340 280 Q220 230 220 160 L240 55 Z" fill="#1B3A2A" stroke="#2D5A2D" stroke-width="2"/>
+  <path d="M340 46 L428 67 L446 162 Q446 222 340 266 Q234 222 234 162 L252 67 Z" fill="none" stroke="#4A7A4A" stroke-width="1.5"/>
+  <path d="M340 52 L424 72 L441 162 Q441 218 340 260 Q239 218 239 162 L256 72 Z" fill="#243F2F"/>
+  <path d="M340 46 L428 67 L424 85 L340 65 L256 85 L252 67 Z" fill="#C9922A"/>
+  <path d="M320 100 L360 100 L368 150 Q368 168 340 172 Q312 168 312 150 Z" fill="#C9922A"/>
+  <path d="M312 110 Q295 108 294 125 Q293 142 312 140" fill="none" stroke="#C9922A" stroke-width="4" stroke-linecap="round"/>
+  <path d="M368 110 Q385 108 386 125 Q387 142 368 140" fill="none" stroke="#C9922A" stroke-width="4" stroke-linecap="round"/>
+  <rect x="333" y="172" width="14" height="20" fill="#C9922A"/>
+  <rect x="322" y="192" width="36" height="7" rx="3" fill="#C9922A"/>
+  <polygon points="340,82 343,90 352,90 345,95 348,103 340,98 332,103 335,95 328,90 337,90" fill="#E8B44A"/>
+  <ellipse cx="258" cy="170" rx="9" ry="5" transform="rotate(-35,258,170)" fill="#3D6B3D"/>
+  <ellipse cx="262" cy="184" rx="9" ry="5" transform="rotate(-30,262,184)" fill="#3D6B3D"/>
+  <ellipse cx="268" cy="198" rx="9" ry="5" transform="rotate(-25,268,198)" fill="#3D6B3D"/>
+  <ellipse cx="277" cy="211" rx="9" ry="5" transform="rotate(-20,277,211)" fill="#4A7A4A"/>
+  <ellipse cx="288" cy="223" rx="8" ry="5" transform="rotate(-15,288,223)" fill="#4A7A4A"/>
+  <ellipse cx="422" cy="170" rx="9" ry="5" transform="rotate(35,422,170)" fill="#3D6B3D"/>
+  <ellipse cx="418" cy="184" rx="9" ry="5" transform="rotate(30,418,184)" fill="#3D6B3D"/>
+  <ellipse cx="412" cy="198" rx="9" ry="5" transform="rotate(25,412,198)" fill="#3D6B3D"/>
+  <ellipse cx="403" cy="211" rx="9" ry="5" transform="rotate(20,403,211)" fill="#4A7A4A"/>
+  <ellipse cx="392" cy="223" rx="8" ry="5" transform="rotate(15,392,223)" fill="#4A7A4A"/>
+</svg>
