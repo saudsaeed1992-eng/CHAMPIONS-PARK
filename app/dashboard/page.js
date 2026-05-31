@@ -285,15 +285,14 @@ export default function DashboardPage() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
               <div>
-                <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A' }}>🗓 Your 2-Week Starter Plan</h2>
+                <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A' }}>🗓 Your Personalized Plan</h2>
                 <p style={{ fontSize: '13px', color: '#5A7A5A', fontStyle: 'italic' }}>Personalized by Claude AI for your goal</p>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {[1, 2].map(w => (
-                  <button key={w} onClick={() => { setWeekTab(w); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Week {w}</button>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {(plan?.workout_plan?.weeks || []).map(w => (
+                  <button key={w.week} onClick={() => { setWeekTab(w.week); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w.week ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w.week ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Week {w.week}</button>
                 ))}
               </div>
-            </div>
 
             {workoutDays.length === 0 ? (
               <div style={{ ...cardStyle, textAlign: 'center', padding: '40px', color: '#5A7A5A' }}>No workout days found for this week.</div>
