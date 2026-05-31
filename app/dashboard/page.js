@@ -1,639 +1,1268 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import supabase from '@/lib/supabase';
+// app/dashboard/page.js
+// Champions Park — Full Dashboard
+// Tabs: Plan, Meals, Progress, Photos
+// Fully translated EN, AR, KU, TR with RTL support
 
-const YOUTUBE_VIDEOS = {
-  cardio: [
-    { name: 'Treadmill HIIT Workout', url: 'https://www.youtube.com/watch?v=CBp_7KaY61c' },
-    { name: 'Low Impact Cardio', url: 'https://www.youtube.com/watch?v=ml6cT4AZdqI' },
-    { name: 'Fat Burning Cardio', url: 'https://www.youtube.com/watch?v=gC_L9qAHVJ8' },
-  ],
-  strength: [
-    { name: 'Full Body Strength', url: 'https://www.youtube.com/watch?v=UBMk30rjy0o' },
-    { name: 'Dumbbell Workout', url: 'https://www.youtube.com/watch?v=U9QgDcNNsDQ' },
-    { name: 'Push Day Workout', url: 'https://www.youtube.com/watch?v=qEwKCR5JCog' },
-  ],
-};
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useLanguage } from '@/lib/LanguageContext'
 
-const MEAL_VIDEOS = {
-  Breakfast: 'https://www.youtube.com/watch?v=xAl2_LNFGkA',
-  Lunch: 'https://www.youtube.com/watch?v=qO6IFBMxBOY',
-  Dinner: 'https://www.youtube.com/watch?v=d5ES4T5Jj6s',
-  Snack: 'https://www.youtube.com/watch?v=8MjBzou2P_I',
-};
-
-const QUOTES = {
-  weight_loss: [
-    { quote: 'Every workout is progress. Every healthy meal is a victory.', author: 'Champions Park' },
-    { quote: 'Your body achieves what your mind believes.', author: 'Champions Park' },
-    { quote: 'The pain you feel today is the strength you feel tomorrow.', author: 'Champions Park' },
-    { quote: 'Success is the sum of small efforts repeated every day.', author: 'Robert Collier' },
-    { quote: 'Take care of your body — it is the only place you have to live.', author: 'Jim Rohn' },
+const MOTIVATION_QUOTES = {
+  en: [
+    "Every champion was once a contender who refused to give up.",
+    "The pain you feel today will be the strength you feel tomorrow.",
+    "Push yourself because no one else is going to do it for you.",
+    "Great things never come from comfort zones.",
+    "Dream it. Believe it. Build it.",
   ],
-  bodybuilding: [
-    { quote: 'Iron sharpens iron. Every rep builds the champion you are becoming.', author: 'Champions Park' },
-    { quote: 'Strength is built in the moments you push through when you want to stop.', author: 'Champions Park' },
-    { quote: 'The last few reps are what makes the muscle grow.', author: 'Arnold Schwarzenegger' },
-    { quote: 'Pain is temporary. Glory is forever.', author: 'Champions Park' },
-    { quote: 'If it does not challenge you, it will not change you.', author: 'Fred DeVito' },
+  ar: [
+    "كل بطل كان يوماً ما مجرد شخص رفض الاستسلام.",
+    "الألم الذي تشعر به اليوم سيكون القوة التي تشعر بها غداً.",
+    "ادفع نفسك لأنه لا أحد سيفعل ذلك نيابةً عنك.",
+    "الأشياء العظيمة لا تأتي أبداً من مناطق الراحة.",
+    "احلم به. صدّق به. ابنِه.",
   ],
-};
+  ku: [
+    "Her şampiyonekî carekê berxwedêrek bû ku red kir radest bibe.",
+    "Êşa ku îro hîs dikî dê bibe hêza ku sibê hîs bikî.",
+    "Xwe bixe ber ber, ji ber ku tu kesî din nayê kirin ji bo te.",
+    "Tiştên mezin tu carî ji herêmên rehetiyê nayên.",
+    "Xewnê bibîne. Bawer lê bike. Ava bike.",
+  ],
+  tr: [
+    "Her şampiyon bir zamanlar vazgeçmeyi reddeden bir yarışmacıydı.",
+    "Bugün hissettiğin acı yarın hissedeceğin güç olacak.",
+    "Kendini zorla çünkü bunu senin için yapacak başka kimse yok.",
+    "Büyük şeyler asla konfor bölgelerinden gelmez.",
+    "Hayal et. İnan. İnşa et.",
+  ],
+}
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [profile, setProfile] = useState(null);
-  const [plan, setPlan] = useState(null);
-  const [photos, setPhotos] = useState([]);
-  const [progressLogs, setProgressLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('plan');
-  const [selectedDay, setSelectedDay] = useState(0);
-  const [weekTab, setWeekTab] = useState(1);
-  const [weight, setWeight] = useState('');
-  const [steps, setSteps] = useState('');
-  const [progressSaved, setProgressSaved] = useState(false);
-  const [waitEmail, setWaitEmail] = useState('');
-  const [waitDone, setWaitDone] = useState(false);
-  const [waitPosition, setWaitPosition] = useState(0);
-  const [waitLoading, setWaitLoading] = useState(false);
-  const [userId, setUserId] = useState(null);
-  const [regenSchedule, setRegenSchedule] = useState({
-    workout_start: '07:00',
-    workout_end: '08:00',
-    plan_start_date: new Date().toISOString().split('T')[0],
-    plan_end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    daily_routine: '',
-  });
+  const router = useRouter()
+  const supabase = createClientComponentClient()
+  const { t, dir, isRTL, language, setLanguage } = useLanguage()
 
+  const [activeTab, setActiveTab] = useState('plan')
+  const [profile, setProfile] = useState(null)
+  const [plan, setPlan] = useState(null)
+  const [progressLogs, setProgressLogs] = useState([])
+  const [photos, setPhotos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [progressForm, setProgressForm] = useState({ weight: '', steps: '' })
+  const [loggingProgress, setLoggingProgress] = useState(false)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [waitlistEmail, setWaitlistEmail] = useState('')
+  const [waitlistMessage, setWaitlistMessage] = useState('')
+  const [quoteIndex, setQuoteIndex] = useState(0)
+  const [betaNumber, setBetaNumber] = useState(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+
+  // Rotate motivation quotes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setQuoteIndex((prev) => {
+        const quotes = MOTIVATION_QUOTES[language] || MOTIVATION_QUOTES.en
+        return (prev + 1) % quotes.length
+      })
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [language])
+
+  // Load all data
   useEffect(() => {
     const loadData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/'); return; }
-      setUserId(session.user.id);
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/'); return }
 
+      const userId = session.user.id
+
+      // Load profile
       const { data: profileData } = await supabase
-        .from('profiles').select('*').eq('id', session.user.id).single();
-      if (!profileData) { router.push('/onboarding'); return; }
-      setProfile(profileData);
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
+      if (!profileData || !profileData.onboarding_complete) {
+        router.push('/onboarding')
+        return
+      }
+
+      setProfile(profileData)
+
+      // Set language from profile
+      if (profileData.language) {
+        setLanguage(profileData.language)
+      }
+
+      // Get beta number (position among all users)
+      const { count } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact' })
+        .lte('created_at', profileData.created_at)
+      setBetaNumber(count)
+
+      // Load AI plan
       const { data: planData } = await supabase
-        .from('ai_plans').select('*').eq('user_id', session.user.id)
-        .order('generated_at', { ascending: false }).limit(1).single();
-      if (planData) setPlan(planData.plan_content);
+        .from('ai_plans')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
 
-      const { data: photoData } = await supabase
-        .from('user_photos').select('*').eq('user_id', session.user.id);
-      if (photoData) setPhotos(photoData);
+      if (planData) setPlan(planData)
 
+      // Load progress logs
       const { data: logs } = await supabase
-        .from('progress_logs').select('*').eq('user_id', session.user.id)
-        .order('log_date', { ascending: true });
-      if (logs) setProgressLogs(logs);
+        .from('progress_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('logged_at', { ascending: false })
+        .limit(30)
 
-      setLoading(false);
-    };
-    loadData();
-  }, [router]);
+      if (logs) setProgressLogs(logs)
+
+      // Load photos
+      const { data: photoData } = await supabase
+        .from('user_photos')
+        .select('*')
+        .eq('user_id', userId)
+        .order('uploaded_at', { ascending: false })
+
+      if (photoData) setPhotos(photoData)
+
+      setLoading(false)
+    }
+
+    loadData()
+  }, [])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  };
+    await supabase.auth.signOut()
+    router.push('/')
+  }
 
-  const handleSaveProgress = async () => {
-    if (!weight && !steps) return;
-    const today = new Date().toISOString().split('T')[0];
-    const res = await fetch('/api/save-progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId, weight, steps, date: today }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      setProgressSaved(true);
-      setWeight('');
-      setSteps('');
+  const handleLogProgress = async () => {
+    if (!progressForm.weight && !progressForm.steps) return
+    setLoggingProgress(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await supabase.from('progress_logs').insert({
+        user_id: session.user.id,
+        weight: parseFloat(progressForm.weight) || null,
+        steps: parseInt(progressForm.steps) || null,
+        logged_at: new Date().toISOString(),
+      })
+      setProgressMessage(t('progressLogged'))
+      setProgressForm({ weight: '', steps: '' })
+
+      // Reload logs
       const { data: logs } = await supabase
-        .from('progress_logs').select('*').eq('user_id', userId)
-        .order('log_date', { ascending: true });
-      if (logs) setProgressLogs(logs);
-      setTimeout(() => setProgressSaved(false), 3000);
-    }
-  };
+        .from('progress_logs')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('logged_at', { ascending: false })
+        .limit(30)
+      if (logs) setProgressLogs(logs)
 
-  const handleWaitlist = async () => {
-    if (!waitEmail.includes('@')) return;
-    setWaitLoading(true);
-    const res = await fetch('/api/waitlist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: waitEmail, user_id: userId }),
-    });
-    const data = await res.json();
-    setWaitPosition(data.position);
-    setWaitDone(true);
-    setWaitLoading(false);
-  };
+      setTimeout(() => setProgressMessage(''), 3000)
+    } catch (err) {
+      setProgressMessage(t('errorLoggingProgress'))
+    } finally {
+      setLoggingProgress(false)
+    }
+  }
+
+  const handleJoinWaitlist = async () => {
+    if (!waitlistEmail) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const { error } = await supabase.from('waitlist').insert({
+        email: waitlistEmail,
+        user_id: session?.user?.id || null,
+        joined_at: new Date().toISOString(),
+      })
+      if (error) throw error
+      setWaitlistMessage(t('waitlistSuccess'))
+      setWaitlistEmail('')
+    } catch {
+      setWaitlistMessage(t('waitlistError'))
+    }
+    setTimeout(() => setWaitlistMessage(''), 4000)
+  }
+
+  const handlePhotoUpload = async (file) => {
+    if (!file) return
+    setUploadingPhoto(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const ext = file.name.split('.').pop()
+      const path = `${session.user.id}/progress_${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('champion-photos')
+        .upload(path, file, { upsert: true })
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from('champion-photos')
+          .getPublicUrl(path)
+        await supabase.from('user_photos').insert({
+          user_id: session.user.id,
+          position: 'progress',
+          url: urlData.publicUrl,
+          uploaded_at: new Date().toISOString(),
+        })
+        const { data: photoData } = await supabase
+          .from('user_photos')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('uploaded_at', { ascending: false })
+        if (photoData) setPhotos(photoData)
+      }
+    } catch (err) {
+      console.error('Photo upload error:', err)
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  // Parse plan content
+  const parsePlan = () => {
+    if (!plan?.plan_content) return null
+    try {
+      if (typeof plan.plan_content === 'object') return plan.plan_content
+      return JSON.parse(plan.plan_content)
+    } catch {
+      return { raw: plan.plan_content }
+    }
+  }
+
+  const isBodybuilding = profile?.goal === 'bodybuilding'
+  const accentColor = isBodybuilding ? '#8b5cf6' : '#2D5A2D'
+  const accentLight = isBodybuilding ? 'rgba(139,92,246,0.1)' : 'rgba(45,90,45,0.08)'
+
+  const quotes = MOTIVATION_QUOTES[language] || MOTIVATION_QUOTES.en
+  const currentQuote = quotes[quoteIndex % quotes.length]
+
+  // Weight stats
+  const firstWeight = progressLogs.length > 0
+    ? progressLogs[progressLogs.length - 1]?.weight
+    : profile?.weight
+  const latestWeight = progressLogs.length > 0
+    ? progressLogs[0]?.weight
+    : profile?.weight
+  const weightDiff = firstWeight && latestWeight
+    ? (latestWeight - firstWeight).toFixed(1)
+    : 0
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ fontSize: '40px' }}>🏆</div>
-        <div style={{ fontSize: '16px', color: '#5A7A5A', fontFamily: 'Georgia, serif' }}>Loading your dashboard...</div>
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 50%, #E8F5E9 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '60px', height: '60px',
+            border: `4px solid rgba(45,90,45,0.2)`,
+            borderTop: `4px solid #2D5A2D`,
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px',
+          }}></div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <p style={{ color: '#2D5A2D', fontWeight: '600' }}>Loading...</p>
+        </div>
       </div>
-    );
+    )
   }
 
-  const isBuild = profile?.goal_type === 'bodybuilding';
-  const accentColor = isBuild ? '#5C7A5A' : '#2D5A2D';
-  const allWeeks = plan?.workout_plan?.weeks || [];
-  const workoutDays = allWeeks.find(w => w.week === weekTab)?.days || [];
-  const meals = plan?.meal_plan?.meals || [];
-  const targets = plan?.weekly_targets || {};
-  const quoteList = QUOTES[profile?.goal_type] || QUOTES.weight_loss;
-  const todayQuote = quoteList[new Date().getDate() % quoteList.length];
-  const startW = parseFloat(profile?.starting_weight) || 0;
-  const targetW = parseFloat(profile?.target_weight) || 0;
-  const latestLog = progressLogs[progressLogs.length - 1];
-  const currentW = latestLog?.current_weight || startW;
-  const weightProgress = startW && targetW && startW !== targetW
-    ? Math.min(((startW - currentW) / (startW - targetW)) * 100, 100)
-    : 0;
-  const isVideoUnlocked = (profile?.beta_number || 999) <= 20;
-  const isBeforeAfterUnlocked = (profile?.beta_number || 999) <= 5;
-
-  const cardStyle = {
-    background: '#FDFCFA',
-    border: '1px solid rgba(134,168,134,0.3)',
-    borderRadius: '14px',
-    boxShadow: '0 4px 16px rgba(27,58,42,0.08)',
-    padding: '20px',
-  };
-
-  const tagStyle = (bg, color) => ({
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '4px 12px', borderRadius: '20px',
-    fontSize: '12px', fontWeight: '600',
-    background: bg, color: color,
-  });
-
-  const lockStyle = {
-    background: 'rgba(232,245,233,0.8)',
-    border: '1px dashed rgba(134,168,134,0.4)',
-    borderRadius: '10px', padding: '14px',
-    display: 'flex', alignItems: 'center',
-    gap: '10px', fontSize: '13px', color: '#5A7A5A',
-  };
-
-  const inputS = {
-    width: '100%', padding: '10px 14px',
-    background: 'rgba(134,168,134,0.08)',
-    border: '1.5px solid rgba(134,168,134,0.3)',
-    borderRadius: '10px', color: '#1B3A2A',
-    fontSize: '14px', fontFamily: 'inherit',
-    boxSizing: 'border-box',
-  };
-
-  const proFeatures = [
-    'Full AI workout plan for your duration',
-    'Complete meal plan with macros',
-    'YouTube tutorials for every exercise',
-    'Cooking videos for every meal',
-    'Before/after photo comparison',
-    'Advanced analytics dashboard',
-    'Plan regeneration monthly',
-    'Bodybuilder bulk/cut cycle planner',
-  ];
+  const parsedPlan = parsePlan()
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 50%, #E8F5E9 100%)', fontFamily: 'Georgia, system-ui, sans-serif' }}>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #E8F5E9 0%, #dcedc8 50%, #E8F5E9 100%)',
+      fontFamily: "'Inter', system-ui, sans-serif",
+      direction: dir,
+    }}>
 
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(232,245,233,0.96)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(134,168,134,0.3)', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/logo.svg" alt="Champions Park" style={{ width: '30px', height: '30px' }} />
-          <span style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: '700', color: '#1B3A2A' }}>Champions Park</span>
+      {/* ── TOP NAV ── */}
+      <div style={{
+        background: '#FDFCFA',
+        borderBottom: '1px solid rgba(0,0,0,0.08)',
+        padding: '0 24px',
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+      }}>
+        <div style={{
+          maxWidth: '900px',
+          margin: '0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          height: '64px',
+        }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '36px', height: '36px',
+              background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+              borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '18px',
+            }}>🏆</div>
+            <span style={{ fontWeight: '800', fontSize: '16px', color: '#2D5A2D' }}>
+              Champions Park
+            </span>
+          </div>
+
+          {/* Right side */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Beta badge */}
+            {betaNumber && (
+              <div style={{
+                background: 'rgba(201,146,42,0.1)',
+                border: '1px solid rgba(201,146,42,0.25)',
+                borderRadius: '20px',
+                padding: '4px 12px',
+                fontSize: '12px',
+                fontWeight: '700',
+                color: '#C9922A',
+              }}>
+                ⭐ #{betaNumber}
+              </div>
+            )}
+
+            {/* User name */}
+            <span style={{ fontSize: '14px', color: '#555', fontWeight: '500' }}>
+              {profile?.full_name?.split(' ')[0]}
+            </span>
+
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '7px 14px',
+                background: 'transparent',
+                border: '1.5px solid rgba(0,0,0,0.12)',
+                borderRadius: '8px',
+                fontSize: '13px',
+                color: '#666',
+                cursor: 'pointer',
+                fontWeight: '500',
+              }}
+            >
+              {t('logout')}
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' }}>
-          {[['plan', '🗓 Plan'], ['meals', '🍽 Meals'], ['progress', '📊 Progress'], ['photos', '📸 Photos']].map(([tab, label]) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: activeTab === tab ? '#2D5A2D' : 'transparent', color: activeTab === tab ? '#FDFCFA' : '#5A7A5A', fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-              {label}
+      </div>
+
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px' }}>
+
+        {/* ── WELCOME BANNER ── */}
+        <div style={{
+          background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+          borderRadius: '20px',
+          padding: '28px 32px',
+          marginBottom: '24px',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px',
+        }}>
+          <div>
+            <h1 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>
+              {t('dashboardWelcome')}, {profile?.full_name?.split(' ')[0]} 👋
+            </h1>
+            <p style={{ fontSize: '14px', opacity: 0.85 }}>
+              {t('dashboardSubtitle')}
+            </p>
+            <div style={{ marginTop: '12px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <div style={{
+                background: 'rgba(255,255,255,0.15)',
+                borderRadius: '10px',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: '600',
+              }}>
+                🎯 {isBodybuilding ? t('goalMuscle') : t('goalWeightLoss')}
+              </div>
+              <div style={{
+                background: 'rgba(255,255,255,0.15)',
+                borderRadius: '10px',
+                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: '600',
+              }}>
+                📅 {profile?.plan_duration} {t('week')}s
+              </div>
+              {profile?.fitness_level && (
+                <div style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  borderRadius: '10px',
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                }}>
+                  💪 {profile.fitness_level}
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ fontSize: '64px', opacity: 0.3 }}>
+            {isBodybuilding ? '🏋️' : '🔥'}
+          </div>
+        </div>
+
+        {/* ── MOTIVATION CARD ── */}
+        <div style={{
+          background: '#FDFCFA',
+          borderRadius: '16px',
+          padding: '20px 24px',
+          marginBottom: '24px',
+          border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+        }}>
+          <div style={{
+            width: '44px', height: '44px',
+            background: accentLight,
+            borderRadius: '12px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '22px',
+            flexShrink: 0,
+          }}>💬</div>
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontSize: '11px', fontWeight: '700',
+              color: accentColor, letterSpacing: '0.8px',
+              textTransform: 'uppercase', marginBottom: '4px',
+            }}>
+              {t('motivationTitle')}
+            </div>
+            <p style={{
+              fontSize: '14px', color: '#333',
+              fontStyle: 'italic', lineHeight: '1.5',
+              transition: 'opacity 0.5s ease',
+            }}>
+              "{currentQuote}"
+            </p>
+          </div>
+          <div style={{
+            background: accentLight,
+            borderRadius: '20px',
+            padding: '4px 12px',
+            fontSize: '11px',
+            fontWeight: '700',
+            color: accentColor,
+            flexShrink: 0,
+          }}>
+            {t('motivationBadge')}
+          </div>
+        </div>
+
+        {/* ── TABS ── */}
+        <div style={{
+          background: '#FDFCFA',
+          borderRadius: '16px',
+          padding: '6px',
+          marginBottom: '24px',
+          display: 'flex',
+          gap: '4px',
+          border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+        }}>
+          {[
+            { id: 'plan',     label: t('tabPlan') },
+            { id: 'meals',    label: t('tabMeals') },
+            { id: 'progress', label: t('tabProgress') },
+            { id: 'photos',   label: t('tabPhotos') },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                flex: 1,
+                padding: '11px 8px',
+                border: 'none',
+                borderRadius: '12px',
+                background: activeTab === tab.id ? accentColor : 'transparent',
+                color: activeTab === tab.id ? 'white' : '#666',
+                fontSize: '13px',
+                fontWeight: activeTab === tab.id ? '700' : '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {tab.label}
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#2D5A2D', color: '#FDFCFA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px' }}>
-            {profile?.full_name?.[0] || 'U'}
-          </div>
-          <button onClick={handleLogout} style={{ padding: '7px 14px', background: 'transparent', border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '8px', color: '#1B3A2A', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>Logout</button>
-        </div>
-      </nav>
 
-      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 20px' }}>
-
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', color: '#1B3A2A', marginBottom: '4px' }}>Welcome back, {profile?.full_name?.split(' ')[0]} 👋</h1>
-              <p style={{ fontSize: '14px', color: '#5A7A5A', fontStyle: 'italic' }}>Here is your personalized plan for today</p>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={tagStyle(isBuild ? 'rgba(92,122,90,0.12)' : 'rgba(45,90,45,0.1)', accentColor)}>
-                {isBuild ? '💪 Muscle Builder' : '🔥 Fat Loss Mode'}
-              </span>
-              <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>🏅 Beta Member #{profile?.beta_number || '—'}</span>
-              {isVideoUnlocked && <span style={tagStyle('rgba(45,90,45,0.12)', '#2D5A2D')}>🎥 Videos Unlocked</span>}
-              {isBeforeAfterUnlocked && <span style={tagStyle('rgba(201,146,42,0.15)', '#C9922A')}>⭐ VIP Member</span>}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
-          {[
-            { icon: '⚖️', label: 'Starting Weight', value: `${profile?.starting_weight || '—'} kg` },
-            { icon: '📉', label: 'Current Weight', value: `${currentW} kg`, sub: currentW < startW ? `↓ ${(startW - currentW).toFixed(1)} kg lost` : '' },
-            { icon: '🎯', label: 'Target Weight', value: `${profile?.target_weight || '—'} kg` },
-            { icon: '🔥', label: 'Daily Calories', value: targets.calories_per_day ? `${targets.calories_per_day} cal` : '—' },
-          ].map((stat, i) => (
-            <div key={i} style={cardStyle}>
-              <div style={{ fontSize: '20px', marginBottom: '6px' }}>{stat.icon}</div>
-              <div style={{ fontSize: '11px', color: '#5A7A5A', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '4px' }}>{stat.label}</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', fontWeight: '600' }}>{stat.value}</div>
-              {stat.sub && <div style={{ fontSize: '12px', color: '#4A7A4A', marginTop: '2px' }}>{stat.sub}</div>}
-            </div>
-          ))}
-        </div>
-
-        {profile?.injuries && (
-          <div style={{ marginBottom: '20px', background: 'rgba(184,92,56,0.06)', border: '1px solid rgba(184,92,56,0.2)', borderRadius: '14px', padding: '16px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-              <span style={{ fontSize: '18px' }}>⚠️</span>
-              <span style={{ fontWeight: '700', color: '#B85C38', fontSize: '14px' }}>Injury Safety Reminders</span>
-            </div>
-            {profile.injuries.toLowerCase().includes('knee') && ['❌ Avoid deep squats and jumping', '⚠️ Stop if sharp knee pain occurs', '✅ Low-impact alternatives in your plan'].map((n, i) => <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>)}
-            {profile.injuries.toLowerCase().includes('back') && ['❌ Avoid heavy deadlifts until cleared', '❌ Use planks instead of sit-ups', '⚠️ Keep spine neutral on all lifts'].map((n, i) => <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>)}
-            {profile.injuries.toLowerCase().includes('shoulder') && ['❌ Avoid overhead pressing when in pain', '❌ No upright rows', '⚠️ Prioritize rotator cuff mobility'].map((n, i) => <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>)}
-          </div>
-        )}
-
+        {/* ══════════════════════════════════════ */}
+        {/* TAB: PLAN                             */}
+        {/* ══════════════════════════════════════ */}
         {activeTab === 'plan' && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-              <div>
-                <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A' }}>🗓 Your Personalized Plan</h2>
-                <p style={{ fontSize: '13px', color: '#5A7A5A', fontStyle: 'italic' }}>Personalized for your goal and schedule</p>
-              </div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {allWeeks.map(w => (
-                  <button key={w.week} onClick={() => { setWeekTab(w.week); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w.week ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w.week ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
-                    Week {w.week}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <div style={{
+              background: '#FDFCFA',
+              borderRadius: '16px',
+              padding: '28px',
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+              marginBottom: '20px',
+            }}>
+              <h2 style={{
+                fontSize: '20px', fontWeight: '800',
+                color: '#1a1a1a', marginBottom: '20px',
+              }}>
+                {t('yourWorkoutPlan')}
+              </h2>
 
-            {workoutDays.length === 0 ? (
-              <div style={{ ...cardStyle, textAlign: 'center', padding: '40px', color: '#5A7A5A' }}>No workout days found for this week.</div>
-            ) : (
-              <>
-                <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '16px' }}>
-                  {workoutDays.map((day, i) => (
-                    <button key={i} onClick={() => setSelectedDay(i)} style={{ minWidth: '110px', padding: '14px 12px', background: selectedDay === i ? '#2D5A2D' : '#FDFCFA', border: `1.5px solid ${selectedDay === i ? '#2D5A2D' : 'rgba(134,168,134,0.35)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'center', flexShrink: 0, transition: 'all 0.2s', fontFamily: 'inherit' }}>
-                      <div style={{ fontSize: '20px', marginBottom: '4px' }}>{day.emoji || '💪'}</div>
-                      <div style={{ fontSize: '12px', fontWeight: '600', color: selectedDay === i ? '#FDFCFA' : '#1B3A2A' }}>{day.day}</div>
-                      <div style={{ fontSize: '11px', color: selectedDay === i ? 'rgba(253,252,250,0.7)' : '#5A7A5A', marginTop: '2px' }}>{day.duration}</div>
-                    </button>
-                  ))}
-                </div>
-
-                {workoutDays[selectedDay] && (
-                  <div style={cardStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '28px' }}>{workoutDays[selectedDay].emoji}</span>
-                      <div>
-                        <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1B3A2A', marginBottom: '4px' }}>{workoutDays[selectedDay].name}</h3>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <span style={tagStyle('rgba(134,168,134,0.2)', '#2D5A2D')}>⏱ {workoutDays[selectedDay].duration}</span>
-                          <span style={tagStyle('rgba(45,90,45,0.1)', '#2D5A2D')}>{workoutDays[selectedDay].type}</span>
-                        </div>
-                      </div>
+              {parsedPlan ? (
+                <div>
+                  {parsedPlan.raw ? (
+                    // Raw text plan
+                    <div style={{
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '14px',
+                      lineHeight: '1.8',
+                      color: '#333',
+                      background: '#f9f9f7',
+                      borderRadius: '12px',
+                      padding: '20px',
+                    }}>
+                      {parsedPlan.raw}
                     </div>
-                    <div style={{ height: '1px', background: 'rgba(134,168,134,0.25)', marginBottom: '16px' }} />
-                    {(workoutDays[selectedDay].exercises || []).map((ex, i) => (
-                      <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '8px', padding: '12px', background: 'rgba(232,245,233,0.5)', borderRadius: '10px', marginBottom: '8px', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontSize: '14px', fontWeight: '600', color: '#1B3A2A', marginBottom: '2px' }}>{ex.name}</div>
-                          <div style={{ fontSize: '11px', color: '#5A7A5A' }}>📝 {ex.notes}</div>
-                        </div>
-                        {[['Sets', ex.sets], ['Reps', ex.reps], ['Rest', ex.rest]].map(([lbl, val]) => (
-                          <div key={lbl} style={{ textAlign: 'center', minWidth: '44px' }}>
-                            <div style={{ fontSize: '10px', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{lbl}</div>
-                            <div style={{ fontSize: '14px', fontWeight: '700', color: '#1B3A2A' }}>{val}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                    {isVideoUnlocked ? (
-                      <div style={{ marginTop: '12px' }}>
-                        {(YOUTUBE_VIDEOS[workoutDays[selectedDay].type] || YOUTUBE_VIDEOS.cardio).map((vid, i) => (
-                          <a key={i} href={vid.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', marginBottom: '8px', background: 'rgba(45,90,45,0.08)', border: '1px solid rgba(45,90,45,0.2)', borderRadius: '10px', textDecoration: 'none', color: '#1B3A2A', fontSize: '13px', fontWeight: '500' }}>
-                            <span style={{ fontSize: '18px' }}>▶️</span>
-                            <span>{vid.name}</span>
-                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#5A7A5A' }}>YouTube →</span>
-                          </a>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ ...lockStyle, marginTop: '12px' }}>
-                        <span>🔒</span><span>Video Tutorial — Unlocked for first 20 beta members</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'meals' && (
-          <div>
-            <div style={{ marginBottom: '16px' }}>
-              <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', marginBottom: '8px' }}>🍽 Today's Meal Suggestions</h2>
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>🔥 {targets.calories_per_day || '—'} cal/day</span>
-                <span style={tagStyle('rgba(45,90,45,0.1)', '#2D5A2D')}>💪 {targets.protein_grams || '—'}g protein</span>
-              </div>
-            </div>
-            {meals.length === 0 ? (
-              <div style={{ ...cardStyle, textAlign: 'center', padding: '40px', color: '#5A7A5A' }}>No meal plan found.</div>
-            ) : (
-              meals.map((meal, i) => (
-                <div key={i} style={{ ...cardStyle, marginBottom: '14px', borderLeft: '4px solid #4A7A4A' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                    <div>
-                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '2px' }}>{meal.meal}</div>
-                      <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A' }}>{meal.name}</h3>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <span style={tagStyle('rgba(134,168,134,0.2)', '#2D5A2D')}>{meal.calories} cal</span>
-                      <span style={tagStyle('rgba(45,90,45,0.1)', '#2D5A2D')}>{meal.protein}</span>
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: '10px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Ingredients</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {(meal.ingredients || []).map((ing, j) => (
-                        <span key={j} style={{ fontSize: '12px', background: 'rgba(232,245,233,0.8)', border: '1px solid rgba(134,168,134,0.3)', borderRadius: '6px', padding: '3px 8px', color: '#2D5A2D' }}>{ing}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <p style={{ fontSize: '13px', color: '#4A5A4A', lineHeight: '1.6', marginBottom: '12px' }}>{meal.instructions}</p>
-                  {isVideoUnlocked ? (
-                    <a href={MEAL_VIDEOS[meal.meal] || MEAL_VIDEOS.Breakfast} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'rgba(45,90,45,0.08)', border: '1px solid rgba(45,90,45,0.2)', borderRadius: '10px', textDecoration: 'none', color: '#1B3A2A', fontSize: '13px', fontWeight: '500' }}>
-                      <span>🎥</span><span>Watch Cooking Video</span>
-                      <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#5A7A5A' }}>YouTube →</span>
-                    </a>
                   ) : (
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <div style={{ ...lockStyle, flex: 1 }}><span>🔒</span><span>Cooking Video — First 20 members</span></div>
-                      <div style={{ ...lockStyle, flex: 1 }}><span>🔒</span><span>Full Macros — Pro Only</span></div>
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {activeTab === 'progress' && (
-          <div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', marginBottom: '18px' }}>📊 Progress Tracker</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-              <div style={cardStyle}>
-                <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '4px' }}>📝 Log Today</h3>
-                <p style={{ fontSize: '12px', color: '#5A7A5A', marginBottom: '16px', fontStyle: 'italic' }}>
-                  {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                </p>
-                {[{ label: 'Weight (kg)', value: weight, set: setWeight, placeholder: 'e.g. 82.5' }, { label: 'Daily Steps', value: steps, set: setSteps, placeholder: 'e.g. 7500' }].map(f => (
-                  <div key={f.label} style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#5A7A5A', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '6px' }}>{f.label}</label>
-                    <input type="number" value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} style={{ width: '100%', padding: '11px 14px', background: 'rgba(232,245,233,0.5)', border: '1.5px solid rgba(134,168,134,0.35)', borderRadius: '10px', color: '#1B3A2A', fontSize: '15px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-                  </div>
-                ))}
-                <button onClick={handleSaveProgress} style={{ width: '100%', padding: '13px', background: progressSaved ? '#4A7A4A' : '#2D5A2D', border: 'none', borderRadius: '10px', color: '#FDFCFA', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.3s' }}>
-                  {progressSaved ? '✓ Saved! Ready for tomorrow.' : "Save Today's Progress"}
-                </button>
-                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {['💧 Water intake tracker — Pro Only', '😴 Sleep hours tracker — Pro Only'].map((item, i) => (
-                    <div key={i} style={lockStyle}><span>{item}</span></div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={cardStyle}>
-                <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '16px' }}>📈 Weight History</h3>
-                {progressLogs.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '30px', color: '#5A7A5A', fontSize: '13px' }}>
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>📊</div>
-                    Log your first entry to see your progress chart
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px', marginBottom: '8px' }}>
-                      {progressLogs.slice(-7).map((log, i) => {
-                        const maxW = Math.max(...progressLogs.map(l => l.current_weight || 0));
-                        const minW = Math.min(...progressLogs.map(l => l.current_weight || 0));
-                        const range = maxW - minW || 1;
-                        const pct = log.current_weight ? ((log.current_weight - minW) / range) * 60 + 20 : 20;
-                        return (
-                          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                            <div style={{ fontSize: '9px', color: '#5A7A5A' }}>{log.current_weight || '—'}</div>
-                            <div style={{ width: '100%', height: `${pct}px`, background: i === progressLogs.slice(-7).length - 1 ? '#2D5A2D' : 'rgba(45,90,45,0.35)', borderRadius: '4px 4px 0 0', transition: 'height 0.8s ease' }} />
-                            <div style={{ fontSize: '9px', color: '#5A7A5A' }}>{new Date(log.log_date).toLocaleDateString('en', { month: 'numeric', day: 'numeric' })}</div>
+                    // Structured plan
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {Array.isArray(parsedPlan.weeks) && parsedPlan.weeks.map((week, wi) => (
+                        <div key={wi} style={{
+                          border: `1px solid ${accentColor}30`,
+                          borderRadius: '12px',
+                          overflow: 'hidden',
+                        }}>
+                          <div style={{
+                            background: accentLight,
+                            padding: '12px 16px',
+                            fontWeight: '700',
+                            fontSize: '14px',
+                            color: accentColor,
+                          }}>
+                            {t('week')} {week.week || wi + 1}
                           </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ height: '1px', background: 'rgba(134,168,134,0.25)', margin: '12px 0' }} />
-                    <h4 style={{ fontSize: '13px', color: '#2D5A2D', marginBottom: '8px', fontFamily: 'Georgia, serif' }}>👟 Steps History</h4>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '60px' }}>
-                      {progressLogs.slice(-7).map((log, i) => {
-                        const pct = log.daily_steps ? Math.min((log.daily_steps / 10000) * 100, 100) : 10;
-                        const hitGoal = (log.daily_steps || 0) >= 8000;
-                        return (
-                          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                            <div style={{ width: '100%', height: `${pct * 0.5}px`, background: hitGoal ? '#4A7A4A' : 'rgba(134,168,134,0.4)', borderRadius: '3px 3px 0 0' }} />
-                            <div style={{ fontSize: '9px', color: '#5A7A5A' }}>{new Date(log.log_date).toLocaleDateString('en', { day: 'numeric' })}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div style={{ ...cardStyle, marginBottom: '16px' }}>
-              <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '14px' }}>🎯 Weight Goal Progress</h3>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#5A7A5A', marginBottom: '8px' }}>
-                <span>{startW} kg start</span>
-                <span style={{ color: '#2D5A2D', fontWeight: '600' }}>{Math.round(weightProgress)}% complete</span>
-                <span>{targetW} kg goal</span>
-              </div>
-              <div style={{ height: '10px', background: 'rgba(134,168,134,0.25)', borderRadius: '5px', overflow: 'hidden', marginBottom: '8px' }}>
-                <div style={{ height: '100%', width: `${weightProgress}%`, background: 'linear-gradient(90deg, #4A7A4A, #2D5A2D)', borderRadius: '5px', transition: 'width 1s ease' }} />
-              </div>
-              <div style={{ fontSize: '12px', color: '#4A7A4A' }}>
-                {currentW < startW ? `↓ ${(startW - currentW).toFixed(1)} kg lost · ${(currentW - targetW).toFixed(1)} kg remaining` : 'Log your weight to track progress'}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'photos' && (
-          <div>
-            <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', marginBottom: '16px' }}>📸 Your Progress Photos</h2>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>Week 1 — Starting Point</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
-                {['front', 'back', 'left', 'right'].map(type => {
-                  const photo = photos.find(p => p.photo_type === type && p.week_number === 1);
-                  return (
-                    <div key={type} style={{ ...cardStyle, aspectRatio: '3/4', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '6px', overflow: 'hidden' }}>
-                      {photo ? (
-                        <img src={photo.photo_url} alt={type} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
-                      ) : (
-                        <>
-                          <span style={{ fontSize: '24px' }}>📷</span>
-                          <span style={{ fontSize: '11px', color: '#5A7A5A', fontWeight: '600', textTransform: 'capitalize' }}>{type}</span>
-                        </>
-                      )}
-                      <div style={{ fontSize: '10px', color: '#5A7A5A', textAlign: 'center' }}>{type} view</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {isBeforeAfterUnlocked ? (
-              <div style={{ ...cardStyle, background: 'rgba(45,90,45,0.06)', border: '1px solid rgba(45,90,45,0.2)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                  <span style={{ fontSize: '20px' }}>⭐</span>
-                  <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A' }}>Before and After Comparison — VIP Unlocked!</h3>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  {['front', 'back'].map(type => {
-                    const week1 = photos.find(p => p.photo_type === type && p.week_number === 1);
-                    const latest = photos.filter(p => p.photo_type === type).sort((a, b) => b.week_number - a.week_number)[0];
-                    return (
-                      <div key={type}>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#2D5A2D', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px', textAlign: 'center' }}>{type} view</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                          {[{ photo: week1, label: 'Before' }, { photo: latest, label: 'After' }].map(({ photo, label }) => (
-                            <div key={label}>
-                              <div style={{ ...cardStyle, aspectRatio: '3/4', padding: '4px', overflow: 'hidden' }}>
-                                {photo ? <img src={photo.photo_url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5A7A5A', fontSize: '11px' }}>No photo</div>}
+                          {Array.isArray(week.days) && week.days.map((day, di) => (
+                            <div key={di} style={{
+                              padding: '16px',
+                              borderTop: di > 0 ? '1px solid rgba(0,0,0,0.06)' : 'none',
+                            }}>
+                              <div style={{
+                                fontWeight: '700', fontSize: '14px',
+                                color: '#1a1a1a', marginBottom: '8px',
+                              }}>
+                                {t('day')} {day.day || di + 1}
+                                {day.isRest && (
+                                  <span style={{
+                                    marginInlineStart: '10px',
+                                    fontSize: '12px',
+                                    background: '#f0f0f0',
+                                    padding: '2px 8px',
+                                    borderRadius: '10px',
+                                    color: '#888',
+                                    fontWeight: '500',
+                                  }}>
+                                    {t('restDay')}
+                                  </span>
+                                )}
                               </div>
-                              <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: '600', color: '#2D5A2D', marginTop: '4px' }}>{label}</div>
+                              {Array.isArray(day.exercises) && day.exercises.map((ex, ei) => (
+                                <div key={ei} style={{
+                                  background: '#f9f9f7',
+                                  borderRadius: '8px',
+                                  padding: '10px 14px',
+                                  marginBottom: '6px',
+                                  fontSize: '13px',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  flexWrap: 'wrap',
+                                  gap: '8px',
+                                }}>
+                                  <span style={{ fontWeight: '600', color: '#1a1a1a' }}>
+                                    {ex.name}
+                                  </span>
+                                  <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#666' }}>
+                                    {ex.sets && <span>{ex.sets} {t('sets')}</span>}
+                                    {ex.reps && <span>{ex.reps} {t('reps')}</span>}
+                                    {ex.duration && <span>{ex.duration}</span>}
+                                  </div>
+                                </div>
+                              ))}
+                              {day.notes && (
+                                <p style={{ fontSize: '12px', color: '#888', marginTop: '6px', fontStyle: 'italic' }}>
+                                  {day.notes}
+                                </p>
+                              )}
                             </div>
                           ))}
                         </div>
-                      </div>
-                    );
-                  })}
+                      ))}
+
+                      {/* If plan has direct days array */}
+                      {Array.isArray(parsedPlan.days) && parsedPlan.days.map((day, di) => (
+                        <div key={di} style={{
+                          border: `1px solid ${accentColor}30`,
+                          borderRadius: '12px',
+                          overflow: 'hidden',
+                        }}>
+                          <div style={{
+                            background: accentLight,
+                            padding: '12px 16px',
+                            fontWeight: '700',
+                            fontSize: '14px',
+                            color: accentColor,
+                          }}>
+                            {t('day')} {day.day || di + 1}
+                            {day.isRest && ` — ${t('restDay')}`}
+                          </div>
+                          <div style={{ padding: '16px' }}>
+                            {Array.isArray(day.exercises) && day.exercises.map((ex, ei) => (
+                              <div key={ei} style={{
+                                background: '#f9f9f7',
+                                borderRadius: '8px',
+                                padding: '10px 14px',
+                                marginBottom: '6px',
+                                fontSize: '13px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flexWrap: 'wrap',
+                                gap: '8px',
+                              }}>
+                                <span style={{ fontWeight: '600' }}>{ex.name}</span>
+                                <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#666' }}>
+                                  {ex.sets && <span>{ex.sets} {t('sets')}</span>}
+                                  {ex.reps && <span>{ex.reps} {t('reps')}</span>}
+                                  {ex.duration && <span>{ex.duration}</span>}
+                                </div>
+                              </div>
+                            ))}
+                            {day.notes && (
+                              <p style={{ fontSize: '12px', color: '#888', marginTop: '6px', fontStyle: 'italic' }}>
+                                {day.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ) : (
-              <div style={{ ...cardStyle, textAlign: 'center', padding: '32px' }}>
-                <div style={{ fontSize: '32px', marginBottom: '10px' }}>🔒</div>
-                <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '6px' }}>Before/After Comparison</h3>
-                <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px' }}>Unlocked for the first 5 beta members</p>
-                <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>You are Beta Member #{profile?.beta_number} — Join waitlist below to unlock Pro features</span>
-              </div>
-            )}
+              ) : (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '40px 20px',
+                  color: '#aaa',
+                }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>⏳</div>
+                  <p>{t('errorLoadingPlan')}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Locked: Regenerate */}
+            <div style={{
+              background: '#FDFCFA',
+              borderRadius: '16px',
+              padding: '24px',
+              border: '1px solid rgba(0,0,0,0.06)',
+              opacity: 0.7,
+              textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '28px', marginBottom: '8px' }}>🔒</div>
+              <p style={{ fontWeight: '700', color: '#333', marginBottom: '4px' }}>
+                {t('regeneratePlan')}
+              </p>
+              <p style={{ fontSize: '13px', color: '#888' }}>
+                {t('regenerateLocked')}
+              </p>
+            </div>
           </div>
         )}
 
-        <div style={{ marginTop: '24px', ...cardStyle, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(245,240,232,0.92)', backdropFilter: 'blur(3px)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', borderRadius: '14px', padding: '24px', textAlign: 'center' }}>
-            <div style={{ fontSize: '36px' }}>🔒</div>
-            <div style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1B3A2A', fontWeight: '700' }}>Plan Regeneration — Pro Feature</div>
-            <div style={{ fontSize: '13px', color: '#5A7A5A', maxWidth: '280px', lineHeight: '1.6' }}>
-              Update your schedule, dates and daily routine then regenerate your plan anytime. Available when Champions Park Pro launches.
+        {/* ══════════════════════════════════════ */}
+        {/* TAB: MEALS                            */}
+        {/* ══════════════════════════════════════ */}
+        {activeTab === 'meals' && (
+          <div>
+            {/* Today's meal */}
+            <div style={{
+              background: '#FDFCFA',
+              borderRadius: '16px',
+              padding: '28px',
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+              marginBottom: '20px',
+            }}>
+              <h2 style={{
+                fontSize: '20px', fontWeight: '800',
+                color: '#1a1a1a', marginBottom: '20px',
+              }}>
+                {t('todaysMeal')}
+              </h2>
+
+              {parsedPlan?.meals ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {[
+                    { key: 'breakfast', label: t('mealBreakfast'), emoji: '🌅' },
+                    { key: 'lunch',     label: t('mealLunch'),     emoji: '☀️' },
+                    { key: 'dinner',    label: t('mealDinner'),    emoji: '🌙' },
+                    { key: 'snack',     label: t('mealSnack'),     emoji: '🍎' },
+                  ].map(({ key, label, emoji }) => {
+                    const meal = parsedPlan.meals[key] || parsedPlan.meals?.today?.[key]
+                    if (!meal) return null
+                    return (
+                      <div key={key} style={{
+                        border: `1px solid ${accentColor}25`,
+                        borderRadius: '12px',
+                        padding: '16px',
+                        background: accentLight,
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          marginBottom: '8px',
+                        }}>
+                          <span style={{ fontSize: '20px' }}>{emoji}</span>
+                          <span style={{
+                            fontWeight: '700', fontSize: '14px',
+                            color: accentColor,
+                          }}>{label}</span>
+                        </div>
+                        <p style={{ fontSize: '14px', color: '#333', lineHeight: '1.5' }}>
+                          {typeof meal === 'string' ? meal : meal.description || meal.name || JSON.stringify(meal)}
+                        </p>
+                        {meal.calories && (
+                          <div style={{
+                            display: 'flex', gap: '16px',
+                            marginTop: '10px', fontSize: '12px',
+                          }}>
+                            {[
+                              { label: t('calories'), value: meal.calories },
+                              { label: t('protein'),  value: meal.protein },
+                              { label: t('carbs'),    value: meal.carbs },
+                              { label: t('fat'),      value: meal.fat },
+                            ].map((macro) => macro.value && (
+                              <span key={macro.label} style={{
+                                background: 'rgba(255,255,255,0.6)',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                fontWeight: '600',
+                                color: '#555',
+                              }}>
+                                {macro.label}: {macro.value}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                // Show raw meal from plan if structured not available
+                <div style={{
+                  background: accentLight,
+                  borderRadius: '12px',
+                  padding: '20px',
+                }}>
+                  <p style={{ fontSize: '14px', color: '#333', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
+                    {parsedPlan?.meal_plan || parsedPlan?.raw?.includes?.('meal')
+                      ? parsedPlan.meal_plan || 'See your plan for meal details.'
+                      : `🥗 ${isBodybuilding
+                          ? 'High protein meal: Grilled chicken 200g, brown rice 150g, steamed broccoli, olive oil. ~600 cal, 45g protein.'
+                          : 'Balanced meal: Baked salmon 150g, sweet potato 100g, mixed salad with lemon dressing. ~450 cal, 35g protein.'
+                        }`
+                    }
+                  </p>
+                </div>
+              )}
             </div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(201,146,42,0.12)', border: '1px solid rgba(201,146,42,0.3)', borderRadius: '20px', padding: '8px 20px', fontSize: '13px', fontWeight: '600', color: '#C9922A' }}>
-              🚀 Join waitlist below to get early access
-            </div>
-          </div>
-          <div style={{ filter: 'blur(2px)', pointerEvents: 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-              <span style={{ fontSize: '22px' }}>🔄</span>
-              <div>
-                <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1B3A2A', margin: 0 }}>Regenerate Your Plan</h3>
-                <p style={{ fontSize: '12px', color: '#5A7A5A', margin: 0, fontStyle: 'italic' }}>Update your schedule and generate a fresh plan</p>
+
+            {/* Locked: Full meal plan */}
+            <div style={{
+              background: '#FDFCFA',
+              borderRadius: '16px',
+              padding: '28px',
+              border: '1px solid rgba(0,0,0,0.06)',
+            }}>
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔒</div>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#333', marginBottom: '8px' }}>
+                  {t('lockedTitle')}
+                </h3>
+                <p style={{ fontSize: '14px', color: '#888', marginBottom: '20px' }}>
+                  {t('fullMealPlanLocked')}
+                </p>
+                <p style={{ fontSize: '13px', color: '#aaa' }}>
+                  {t('lockedDesc')}
+                </p>
+              </div>
+
+              {/* Waitlist form */}
+              <div style={{ marginTop: '20px' }}>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <input
+                    type="email"
+                    placeholder={t('emailPlaceholder')}
+                    value={waitlistEmail}
+                    onChange={(e) => setWaitlistEmail(e.target.value)}
+                    style={{
+                      flex: 1,
+                      minWidth: '200px',
+                      padding: '12px 14px',
+                      border: '1.5px solid rgba(0,0,0,0.12)',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      background: '#fafafa',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      direction: 'ltr',
+                    }}
+                  />
+                  <button
+                    onClick={handleJoinWaitlist}
+                    style={{
+                      padding: '12px 20px',
+                      background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {t('joinWaitlist')}
+                  </button>
+                </div>
+                {waitlistMessage && (
+                  <p style={{
+                    marginTop: '10px',
+                    fontSize: '13px',
+                    color: waitlistMessage.includes('🎉') ? '#22c55e' : '#ef4444',
+                    fontWeight: '600',
+                  }}>
+                    {waitlistMessage}
+                  </p>
+                )}
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════ */}
+        {/* TAB: PROGRESS                         */}
+        {/* ══════════════════════════════════════ */}
+        {activeTab === 'progress' && (
+          <div>
+            {/* Stats row */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '16px',
+              marginBottom: '20px',
+            }}>
               {[
-                { label: 'Workout Start Time', type: 'time', key: 'workout_start' },
-                { label: 'Workout End Time', type: 'time', key: 'workout_end' },
-                { label: 'Plan Start Date', type: 'date', key: 'plan_start_date' },
-                { label: 'Plan End Date', type: 'date', key: 'plan_end_date' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#5A7A5A', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '5px' }}>{f.label}</label>
-                  <input type={f.type} style={inputS} value={regenSchedule[f.key]} onChange={e => setRegenSchedule({ ...regenSchedule, [f.key]: e.target.value })} />
+                {
+                  label: isBodybuilding ? t('weightGained') : t('weightLost'),
+                  value: `${Math.abs(weightDiff)} kg`,
+                  emoji: weightDiff < 0 ? '📉' : '📈',
+                  color: weightDiff < 0 ? '#22c55e' : '#ef4444',
+                },
+                {
+                  label: t('currentWeight'),
+                  value: `${latestWeight || profile?.weight || '--'} kg`,
+                  emoji: '⚖️',
+                  color: accentColor,
+                },
+                {
+                  label: t('totalSteps'),
+                  value: progressLogs.reduce((sum, l) => sum + (l.steps || 0), 0).toLocaleString(),
+                  emoji: '👣',
+                  color: '#3b82f6',
+                },
+              ].map((stat, i) => (
+                <div key={i} style={{
+                  background: '#FDFCFA',
+                  borderRadius: '16px',
+                  padding: '20px 16px',
+                  border: '1px solid rgba(0,0,0,0.06)',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: '28px', marginBottom: '6px' }}>{stat.emoji}</div>
+                  <div style={{
+                    fontSize: '22px', fontWeight: '800',
+                    color: stat.color, marginBottom: '4px',
+                  }}>
+                    {stat.value}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888', fontWeight: '600' }}>
+                    {stat.label}
+                  </div>
                 </div>
               ))}
             </div>
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#5A7A5A', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '5px' }}>Updated Daily Routine Notes</label>
-              <textarea style={{ ...inputS, height: '80px', resize: 'vertical' }} value={regenSchedule.daily_routine} onChange={e => setRegenSchedule({ ...regenSchedule, daily_routine: e.target.value })} placeholder="Describe any changes to your routine..." />
+
+            {/* Log progress form */}
+            <div style={{
+              background: '#FDFCFA',
+              borderRadius: '16px',
+              padding: '28px',
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+              marginBottom: '20px',
+            }}>
+              <h2 style={{
+                fontSize: '18px', fontWeight: '800',
+                color: '#1a1a1a', marginBottom: '20px',
+              }}>
+                {t('logProgress')}
+              </h2>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{
+                    display: 'block', fontSize: '11px',
+                    fontWeight: '700', letterSpacing: '0.8px',
+                    color: '#555', marginBottom: '6px',
+                    textTransform: 'uppercase',
+                  }}>{t('currentWeight')}</label>
+                  <input
+                    type="number"
+                    placeholder="kg"
+                    value={progressForm.weight}
+                    onChange={(e) => setProgressForm({ ...progressForm, weight: e.target.value })}
+                    style={{
+                      width: '100%', padding: '12px 14px',
+                      border: '1.5px solid rgba(0,0,0,0.12)',
+                      borderRadius: '10px', fontSize: '15px',
+                      background: '#fafafa', outline: 'none',
+                      fontFamily: 'inherit', direction: 'ltr',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{
+                    display: 'block', fontSize: '11px',
+                    fontWeight: '700', letterSpacing: '0.8px',
+                    color: '#555', marginBottom: '6px',
+                    textTransform: 'uppercase',
+                  }}>{t('steps')}</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={progressForm.steps}
+                    onChange={(e) => setProgressForm({ ...progressForm, steps: e.target.value })}
+                    style={{
+                      width: '100%', padding: '12px 14px',
+                      border: '1.5px solid rgba(0,0,0,0.12)',
+                      borderRadius: '10px', fontSize: '15px',
+                      background: '#fafafa', outline: 'none',
+                      fontFamily: 'inherit', direction: 'ltr',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleLogProgress}
+                disabled={loggingProgress}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: loggingProgress ? '#ccc' : `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '15px',
+                  fontWeight: '700',
+                  cursor: loggingProgress ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {loggingProgress ? t('logging') : t('logButton')}
+              </button>
+
+              {progressMessage && (
+                <p style={{
+                  marginTop: '12px',
+                  textAlign: 'center',
+                  fontSize: '14px',
+                  color: progressMessage.includes('✅') ? '#22c55e' : '#ef4444',
+                  fontWeight: '600',
+                }}>
+                  {progressMessage}
+                </p>
+              )}
             </div>
-            <button style={{ width: '100%', padding: '13px', background: '#2D5A2D', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '15px', fontWeight: '700', cursor: 'not-allowed', fontFamily: 'inherit', opacity: 0.5 }}>
-              🔄 Regenerate My Plan
+
+            {/* Progress history */}
+            <div style={{
+              background: '#FDFCFA',
+              borderRadius: '16px',
+              padding: '28px',
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+            }}>
+              <h2 style={{
+                fontSize: '18px', fontWeight: '800',
+                color: '#1a1a1a', marginBottom: '20px',
+              }}>
+                {t('progressHistory')}
+              </h2>
+
+              {progressLogs.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px', color: '#aaa' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '10px' }}>📊</div>
+                  <p>{t('noProgressYet')}</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {progressLogs.map((log, i) => (
+                    <div key={log.id || i} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '14px 16px',
+                      background: '#f9f9f7',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                    }}>
+                      <span style={{ color: '#888', fontSize: '13px' }}>
+                        {new Date(log.logged_at).toLocaleDateString(
+                          language === 'ar' ? 'ar-SA' :
+                          language === 'tr' ? 'tr-TR' : 'en-GB'
+                        )}
+                      </span>
+                      <div style={{ display: 'flex', gap: '20px' }}>
+                        {log.weight && (
+                          <span style={{ fontWeight: '700', color: '#1a1a1a' }}>
+                            ⚖️ {log.weight} kg
+                          </span>
+                        )}
+                        {log.steps && (
+                          <span style={{ fontWeight: '700', color: '#3b82f6' }}>
+                            👣 {log.steps.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════ */}
+        {/* TAB: PHOTOS                           */}
+        {/* ══════════════════════════════════════ */}
+        {activeTab === 'photos' && (
+          <div>
+            <div style={{
+              background: '#FDFCFA',
+              borderRadius: '16px',
+              padding: '28px',
+              border: '1px solid rgba(0,0,0,0.06)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+              marginBottom: '20px',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+                flexWrap: 'wrap',
+                gap: '12px',
+              }}>
+                <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#1a1a1a' }}>
+                  {t('myPhotos')}
+                </h2>
+
+                {/* Upload button */}
+                <label style={{
+                  padding: '10px 18px',
+                  background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+                  color: 'white',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      if (e.target.files[0]) handlePhotoUpload(e.target.files[0])
+                    }}
+                  />
+                  {uploadingPhoto ? t('uploading') : `📷 ${t('uploadNewPhoto')}`}
+                </label>
+              </div>
+
+              {photos.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 20px', color: '#aaa' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '12px' }}>📸</div>
+                  <p>{t('noPhotos')}</p>
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                  gap: '12px',
+                }}>
+                  {photos.map((photo, i) => (
+                    <div key={photo.id || i} style={{
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      border: '1px solid rgba(0,0,0,0.08)',
+                      position: 'relative',
+                    }}>
+                      <img
+                        src={photo.url}
+                        alt={photo.position}
+                        style={{
+                          width: '100%',
+                          height: '180px',
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
+                      />
+                      <div style={{
+                        padding: '8px 10px',
+                        fontSize: '11px',
+                        color: '#888',
+                        fontWeight: '600',
+                        background: '#fafafa',
+                      }}>
+                        {photo.position} · {new Date(photo.uploaded_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Locked: before/after */}
+            <div style={{
+              background: '#FDFCFA',
+              borderRadius: '16px',
+              padding: '28px',
+              border: '1px solid rgba(0,0,0,0.06)',
+              textAlign: 'center',
+              opacity: 0.75,
+            }}>
+              <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔒</div>
+              <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#333', marginBottom: '8px' }}>
+                {t('lockedTitle')}
+              </h3>
+              <p style={{ fontSize: '14px', color: '#888' }}>
+                {t('beforeAfterLocked')}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── PRO WAITLIST FOOTER ── */}
+        <div style={{
+          marginTop: '32px',
+          background: `linear-gradient(135deg, ${accentColor}15, ${accentColor}08)`,
+          border: `1px solid ${accentColor}25`,
+          borderRadius: '16px',
+          padding: '24px',
+          textAlign: 'center',
+        }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '700', color: accentColor, marginBottom: '6px' }}>
+            🚀 {t('proWaitlist')}
+          </h3>
+          <p style={{ fontSize: '13px', color: '#888', marginBottom: '16px' }}>
+            {t('lockedDesc')}
+          </p>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="email"
+              placeholder={t('emailPlaceholder')}
+              value={waitlistEmail}
+              onChange={(e) => setWaitlistEmail(e.target.value)}
+              style={{
+                padding: '11px 16px',
+                border: '1.5px solid rgba(0,0,0,0.12)',
+                borderRadius: '10px',
+                fontSize: '14px',
+                background: 'white',
+                outline: 'none',
+                fontFamily: 'inherit',
+                width: '240px',
+                direction: 'ltr',
+              }}
+            />
+            <button
+              onClick={handleJoinWaitlist}
+              style={{
+                padding: '11px 20px',
+                background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                fontSize: '14px',
+                fontWeight: '700',
+                cursor: 'pointer',
+              }}
+            >
+              {t('joinWaitlist')}
             </button>
           </div>
-        </div>
-
-        <div style={{ ...cardStyle, marginTop: '24px', borderLeft: '4px solid #4A7A4A' }}>
-          <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>✨ Today's Motivation</div>
-          <blockquote style={{ fontFamily: 'Georgia, serif', fontSize: '15px', fontStyle: 'italic', color: '#1B3A2A', lineHeight: '1.7', margin: 0, marginBottom: '8px' }}>
-            "{todayQuote.quote}"
-          </blockquote>
-          <div style={{ fontSize: '12px', color: '#5A7A5A' }}>— {todayQuote.author}</div>
-        </div>
-
-        <div style={{ marginTop: '24px', background: '#1B3A2A', borderRadius: '20px', padding: '32px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', borderRadius: '50%', background: 'rgba(134,168,134,0.08)', pointerEvents: 'none' }} />
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', color: '#FDFCFA', marginBottom: '6px' }}>🚀 Champions Park Pro — Coming Soon</h2>
-          <p style={{ fontSize: '14px', color: 'rgba(253,252,250,0.6)', fontStyle: 'italic', marginBottom: '20px' }}>Join the waitlist. Be first. Get 50% off.</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', marginBottom: '24px' }}>
-            {proFeatures.map((f, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'rgba(253,252,250,0.85)' }}>
-                <span style={{ color: '#86A886' }}>✓</span> {f}
-              </div>
-            ))}
-          </div>
-          {waitDone ? (
-            <div style={{ background: 'rgba(134,168,134,0.15)', border: '1px solid rgba(134,168,134,0.3)', borderRadius: '12px', padding: '16px', textAlign: 'center', color: '#FDFCFA' }}>
-              <div style={{ fontSize: '22px', marginBottom: '6px' }}>✅</div>
-              <div style={{ fontWeight: '600', marginBottom: '2px' }}>You are #{waitPosition} on the waitlist!</div>
-              <div style={{ fontSize: '12px', color: 'rgba(253,252,250,0.5)' }}>{waitPosition} champions already waiting</div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <input type="email" value={waitEmail} onChange={e => setWaitEmail(e.target.value)} placeholder="your@email.com" style={{ flex: 1, minWidth: '200px', padding: '13px 16px', background: 'rgba(253,252,250,0.08)', border: '1px solid rgba(253,252,250,0.15)', borderRadius: '10px', color: '#FDFCFA', fontSize: '15px', fontFamily: 'inherit' }} />
-              <button onClick={handleWaitlist} disabled={waitLoading} style={{ padding: '13px 24px', background: '#4A7A4A', border: 'none', borderRadius: '10px', color: '#FDFCFA', fontSize: '14px', fontWeight: '700', cursor: waitLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-                {waitLoading ? 'Joining...' : 'Join Waitlist'}
-              </button>
-            </div>
+          {waitlistMessage && (
+            <p style={{
+              marginTop: '10px',
+              fontSize: '13px',
+              color: waitlistMessage.includes('🎉') ? '#22c55e' : '#ef4444',
+              fontWeight: '600',
+            }}>
+              {waitlistMessage}
+            </p>
           )}
         </div>
 
-        <div style={{ height: '40px' }} />
+        {/* Bottom padding */}
+        <div style={{ height: '40px' }}></div>
       </div>
     </div>
-  );
+  )
 }
