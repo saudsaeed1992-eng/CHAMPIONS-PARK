@@ -1,6 +1,10 @@
 export const metadata = {
   title: 'Champions Park 🏆',
-  description: 'Where Champions Are Built. Free AI fitness plans for weight loss and bodybuilding.',
+  description: 'Where Champions Are Built. Free AI fitness plans powered by Claude AI.',
+  icons: {
+    icon: '/logo.svg',
+    apple: '/logo.svg',
+  },
 }
 
 export default function RootLayout({ children }) {
