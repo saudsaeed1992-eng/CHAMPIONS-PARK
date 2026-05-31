@@ -148,7 +148,8 @@ export default function DashboardPage() {
 
   const isBuild = profile?.goal_type === 'bodybuilding';
   const accentColor = isBuild ? '#5C7A5A' : '#2D5A2D';
-  const workoutDays = plan?.workout_plan?.weeks?.find(w => w.week === weekTab)?.days || [];
+  const allWeeks = plan?.workout_plan?.weeks || [];
+  const workoutDays = allWeeks.find(w => w.week === weekTab)?.days || [];
   const meals = plan?.meal_plan?.meals || [];
   const targets = plan?.weekly_targets || {};
   const quoteList = QUOTES[profile?.goal_type] || QUOTES.weight_loss;
@@ -196,24 +197,23 @@ export default function DashboardPage() {
   };
 
   const proFeatures = [
-    'Full 8-week AI workout plan',
+    'Full AI workout plan for your duration',
     'Complete meal plan with macros',
     'YouTube tutorials for every exercise',
     'Cooking videos for every meal',
     'Before/after photo comparison',
     'Advanced analytics dashboard',
-    'AI plan regeneration monthly',
+    'Plan regeneration monthly',
     'Bodybuilder bulk/cut cycle planner',
   ];
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 50%, #E8F5E9 100%)', fontFamily: 'Georgia, system-ui, sans-serif' }}>
 
-      {/* NAV */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(232,245,233,0.96)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(134,168,134,0.3)', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/logo.svg" alt="Champions Park" style={{ width: '32px', height: '32px' }} />
-<span style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: '700', color: '#1B3A2A' }}>Champions Park</span>
+          <img src="/logo.svg" alt="Champions Park" style={{ width: '30px', height: '30px' }} />
+          <span style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: '700', color: '#1B3A2A' }}>Champions Park</span>
         </div>
         <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' }}>
           {[['plan', '🗓 Plan'], ['meals', '🍽 Meals'], ['progress', '📊 Progress'], ['photos', '📸 Photos']].map(([tab, label]) => (
@@ -232,12 +232,11 @@ export default function DashboardPage() {
 
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 20px' }}>
 
-        {/* HEADER */}
         <div style={{ marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', color: '#1B3A2A', marginBottom: '4px' }}>Welcome back, {profile?.full_name?.split(' ')[0]} 👋</h1>
-              <p style={{ fontSize: '14px', color: '#5A7A5A', fontStyle: 'italic' }}>Here's your personalized plan for today</p>
+              <p style={{ fontSize: '14px', color: '#5A7A5A', fontStyle: 'italic' }}>Here is your personalized plan for today</p>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <span style={tagStyle(isBuild ? 'rgba(92,122,90,0.12)' : 'rgba(45,90,45,0.1)', accentColor)}>
@@ -250,7 +249,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* STAT CARDS */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '24px' }}>
           {[
             { icon: '⚖️', label: 'Starting Weight', value: `${profile?.starting_weight || '—'} kg` },
@@ -267,7 +265,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* INJURY CARD */}
         {profile?.injuries && (
           <div style={{ marginBottom: '20px', background: 'rgba(184,92,56,0.06)', border: '1px solid rgba(184,92,56,0.2)', borderRadius: '14px', padding: '16px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -280,19 +277,21 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB: PLAN */}
         {activeTab === 'plan' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A' }}>🗓 Your Personalized Plan</h2>
-                <p style={{ fontSize: '13px', color: '#5A7A5A', fontStyle: 'italic' }}>Personalized by Claude AI for your goal</p>
+                <p style={{ fontSize: '13px', color: '#5A7A5A', fontStyle: 'italic' }}>Personalized for your goal and schedule</p>
               </div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {(plan?.workout_plan?.weeks || []).map(w => (
-                  <button key={w.week} onClick={() => { setWeekTab(w.week); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w.week ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w.week ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Week {w.week}</button>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {allWeeks.map(w => (
+                  <button key={w.week} onClick={() => { setWeekTab(w.week); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w.week ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w.week ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Week {w.week}
+                  </button>
                 ))}
               </div>
+            </div>
 
             {workoutDays.length === 0 ? (
               <div style={{ ...cardStyle, textAlign: 'center', padding: '40px', color: '#5A7A5A' }}>No workout days found for this week.</div>
@@ -357,7 +356,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB: MEALS */}
         {activeTab === 'meals' && (
           <div>
             <div style={{ marginBottom: '16px' }}>
@@ -408,7 +406,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB: PROGRESS */}
         {activeTab === 'progress' && (
           <div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', marginBottom: '18px' }}>📊 Progress Tracker</h2>
@@ -494,7 +491,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB: PHOTOS */}
         {activeTab === 'photos' && (
           <div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', marginBottom: '16px' }}>📸 Your Progress Photos</h2>
@@ -524,7 +520,7 @@ export default function DashboardPage() {
               <div style={{ ...cardStyle, background: 'rgba(45,90,45,0.06)', border: '1px solid rgba(45,90,45,0.2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                   <span style={{ fontSize: '20px' }}>⭐</span>
-                  <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A' }}>Before & After Comparison — VIP Unlocked!</h3>
+                  <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A' }}>Before and After Comparison — VIP Unlocked!</h3>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   {['front', 'back'].map(type => {
@@ -535,7 +531,7 @@ export default function DashboardPage() {
                         <div style={{ fontSize: '11px', fontWeight: '600', color: '#2D5A2D', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px', textAlign: 'center' }}>{type} view</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                           {[{ photo: week1, label: 'Before' }, { photo: latest, label: 'After' }].map(({ photo, label }) => (
-                            <div key={label} style={{ position: 'relative' }}>
+                            <div key={label}>
                               <div style={{ ...cardStyle, aspectRatio: '3/4', padding: '4px', overflow: 'hidden' }}>
                                 {photo ? <img src={photo.photo_url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5A7A5A', fontSize: '11px' }}>No photo</div>}
                               </div>
@@ -559,27 +555,23 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* REGENERATE PLAN — LOCKED FOR BETA */}
         <div style={{ marginTop: '24px', ...cardStyle, position: 'relative', overflow: 'hidden' }}>
-          {/* Lock overlay */}
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(245,240,232,0.92)', backdropFilter: 'blur(3px)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', borderRadius: '14px', padding: '24px', textAlign: 'center' }}>
             <div style={{ fontSize: '36px' }}>🔒</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1B3A2A', fontWeight: '700' }}>Plan Regeneration — Pro Feature</div>
             <div style={{ fontSize: '13px', color: '#5A7A5A', maxWidth: '280px', lineHeight: '1.6' }}>
-              Update your schedule, dates and daily routine then regenerate your AI plan anytime. Available when Champions Park Pro launches.
+              Update your schedule, dates and daily routine then regenerate your plan anytime. Available when Champions Park Pro launches.
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(201,146,42,0.12)', border: '1px solid rgba(201,146,42,0.3)', borderRadius: '20px', padding: '8px 20px', fontSize: '13px', fontWeight: '600', color: '#C9922A' }}>
               🚀 Join waitlist below to get early access
             </div>
           </div>
-
-          {/* Blurred preview behind overlay */}
           <div style={{ filter: 'blur(2px)', pointerEvents: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
               <span style={{ fontSize: '22px' }}>🔄</span>
               <div>
                 <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1B3A2A', margin: 0 }}>Regenerate Your Plan</h3>
-                <p style={{ fontSize: '12px', color: '#5A7A5A', margin: 0, fontStyle: 'italic' }}>Update your schedule and generate a fresh AI plan</p>
+                <p style={{ fontSize: '12px', color: '#5A7A5A', margin: 0, fontStyle: 'italic' }}>Update your schedule and generate a fresh plan</p>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '14px' }}>
@@ -596,8 +588,8 @@ export default function DashboardPage() {
               ))}
             </div>
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#5A7A5A', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '5px' }}>Updated Daily Routine & Notes</label>
-              <textarea style={{ ...inputS, height: '80px', resize: 'vertical' }} value={regenSchedule.daily_routine} onChange={e => setRegenSchedule({ ...regenSchedule, daily_routine: e.target.value })} placeholder="Describe any changes to your routine or schedule..." />
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#5A7A5A', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '5px' }}>Updated Daily Routine Notes</label>
+              <textarea style={{ ...inputS, height: '80px', resize: 'vertical' }} value={regenSchedule.daily_routine} onChange={e => setRegenSchedule({ ...regenSchedule, daily_routine: e.target.value })} placeholder="Describe any changes to your routine..." />
             </div>
             <button style={{ width: '100%', padding: '13px', background: '#2D5A2D', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '15px', fontWeight: '700', cursor: 'not-allowed', fontFamily: 'inherit', opacity: 0.5 }}>
               🔄 Regenerate My Plan
@@ -605,7 +597,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* MOTIVATION */}
         <div style={{ ...cardStyle, marginTop: '24px', borderLeft: '4px solid #4A7A4A' }}>
           <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>✨ Today's Motivation</div>
           <blockquote style={{ fontFamily: 'Georgia, serif', fontSize: '15px', fontStyle: 'italic', color: '#1B3A2A', lineHeight: '1.7', margin: 0, marginBottom: '8px' }}>
@@ -614,7 +605,6 @@ export default function DashboardPage() {
           <div style={{ fontSize: '12px', color: '#5A7A5A' }}>— {todayQuote.author}</div>
         </div>
 
-        {/* PRO WAITLIST */}
         <div style={{ marginTop: '24px', background: '#1B3A2A', borderRadius: '20px', padding: '32px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', borderRadius: '50%', background: 'rgba(134,168,134,0.08)', pointerEvents: 'none' }} />
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', color: '#FDFCFA', marginBottom: '6px' }}>🚀 Champions Park Pro — Coming Soon</h2>
@@ -629,7 +619,7 @@ export default function DashboardPage() {
           {waitDone ? (
             <div style={{ background: 'rgba(134,168,134,0.15)', border: '1px solid rgba(134,168,134,0.3)', borderRadius: '12px', padding: '16px', textAlign: 'center', color: '#FDFCFA' }}>
               <div style={{ fontSize: '22px', marginBottom: '6px' }}>✅</div>
-              <div style={{ fontWeight: '600', marginBottom: '2px' }}>You're #{waitPosition} on the waitlist!</div>
+              <div style={{ fontWeight: '600', marginBottom: '2px' }}>You are #{waitPosition} on the waitlist!</div>
               <div style={{ fontSize: '12px', color: 'rgba(253,252,250,0.5)' }}>{waitPosition} champions already waiting</div>
             </div>
           ) : (
