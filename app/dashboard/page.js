@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
 
@@ -59,7 +59,13 @@ export default function DashboardPage() {
   const [waitPosition, setWaitPosition] = useState(0);
   const [waitLoading, setWaitLoading] = useState(false);
   const [userId, setUserId] = useState(null);
-  const [totalUsers, setTotalUsers] = useState(0);
+  const [regenSchedule, setRegenSchedule] = useState({
+    workout_start: '07:00',
+    workout_end: '08:00',
+    plan_start_date: new Date().toISOString().split('T')[0],
+    plan_end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    daily_routine: '',
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -71,10 +77,6 @@ export default function DashboardPage() {
         .from('profiles').select('*').eq('id', session.user.id).single();
       if (!profileData) { router.push('/onboarding'); return; }
       setProfile(profileData);
-
-      const { count } = await supabase
-        .from('profiles').select('*', { count: 'exact', head: true });
-      setTotalUsers(count || 0);
 
       const { data: planData } = await supabase
         .from('ai_plans').select('*').eq('user_id', session.user.id)
@@ -151,7 +153,6 @@ export default function DashboardPage() {
   const targets = plan?.weekly_targets || {};
   const quoteList = QUOTES[profile?.goal_type] || QUOTES.weight_loss;
   const todayQuote = quoteList[new Date().getDate() % quoteList.length];
-
   const startW = parseFloat(profile?.starting_weight) || 0;
   const targetW = parseFloat(profile?.target_weight) || 0;
   const latestLog = progressLogs[progressLogs.length - 1];
@@ -159,7 +160,6 @@ export default function DashboardPage() {
   const weightProgress = startW && targetW && startW !== targetW
     ? Math.min(((startW - currentW) / (startW - targetW)) * 100, 100)
     : 0;
-
   const isVideoUnlocked = (profile?.beta_number || 999) <= 20;
   const isBeforeAfterUnlocked = (profile?.beta_number || 999) <= 5;
 
@@ -186,6 +186,15 @@ export default function DashboardPage() {
     gap: '10px', fontSize: '13px', color: '#5A7A5A',
   };
 
+  const inputS = {
+    width: '100%', padding: '10px 14px',
+    background: 'rgba(134,168,134,0.08)',
+    border: '1.5px solid rgba(134,168,134,0.3)',
+    borderRadius: '10px', color: '#1B3A2A',
+    fontSize: '14px', fontFamily: 'inherit',
+    boxSizing: 'border-box',
+  };
+
   const proFeatures = [
     'Full 8-week AI workout plan',
     'Complete meal plan with macros',
@@ -201,47 +210,23 @@ export default function DashboardPage() {
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 50%, #E8F5E9 100%)', fontFamily: 'Georgia, system-ui, sans-serif' }}>
 
       {/* NAV */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 100,
-        background: 'rgba(232,245,233,0.96)',
-        backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(134,168,134,0.3)',
-        padding: '12px 24px',
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap',
-      }}>
+      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(232,245,233,0.96)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(134,168,134,0.3)', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '22px' }}>🏆</span>
           <span style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: '700', color: '#1B3A2A' }}>Champions Park</span>
         </div>
         <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' }}>
           {[['plan', '🗓 Plan'], ['meals', '🍽 Meals'], ['progress', '📊 Progress'], ['photos', '📸 Photos']].map(([tab, label]) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} style={{
-              padding: '7px 14px', borderRadius: '8px', border: 'none',
-              background: activeTab === tab ? '#2D5A2D' : 'transparent',
-              color: activeTab === tab ? '#FDFCFA' : '#5A7A5A',
-              fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-              fontFamily: 'inherit', whiteSpace: 'nowrap',
-            }}>
+            <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: activeTab === tab ? '#2D5A2D' : 'transparent', color: activeTab === tab ? '#FDFCFA' : '#5A7A5A', fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
               {label}
             </button>
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '32px', height: '32px', borderRadius: '50%',
-            background: '#2D5A2D', color: '#FDFCFA',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: '700', fontSize: '14px',
-          }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#2D5A2D', color: '#FDFCFA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '14px' }}>
             {profile?.full_name?.[0] || 'U'}
           </div>
-          <button onClick={handleLogout} style={{
-            padding: '7px 14px', background: 'transparent',
-            border: '1.5px solid rgba(134,168,134,0.4)',
-            borderRadius: '8px', color: '#1B3A2A',
-            fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit',
-          }}>Logout</button>
+          <button onClick={handleLogout} style={{ padding: '7px 14px', background: 'transparent', border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '8px', color: '#1B3A2A', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>Logout</button>
         </div>
       </nav>
 
@@ -251,28 +236,16 @@ export default function DashboardPage() {
         <div style={{ marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', color: '#1B3A2A', marginBottom: '4px' }}>
-                Welcome back, {profile?.full_name?.split(' ')[0]} 👋
-              </h1>
+              <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '26px', color: '#1B3A2A', marginBottom: '4px' }}>Welcome back, {profile?.full_name?.split(' ')[0]} 👋</h1>
               <p style={{ fontSize: '14px', color: '#5A7A5A', fontStyle: 'italic' }}>Here's your personalized plan for today</p>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <span style={tagStyle(isBuild ? 'rgba(92,122,90,0.12)' : 'rgba(45,90,45,0.1)', accentColor)}>
                 {isBuild ? '💪 Muscle Builder' : '🔥 Fat Loss Mode'}
               </span>
-              <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>
-                🏅 Beta Member #{profile?.beta_number || '—'}
-              </span>
-              {isVideoUnlocked && (
-                <span style={tagStyle('rgba(45,90,45,0.12)', '#2D5A2D')}>
-                  🎥 Videos Unlocked
-                </span>
-              )}
-              {isBeforeAfterUnlocked && (
-                <span style={tagStyle('rgba(201,146,42,0.15)', '#C9922A')}>
-                  ⭐ VIP Member
-                </span>
-              )}
+              <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>🏅 Beta Member #{profile?.beta_number || '—'}</span>
+              {isVideoUnlocked && <span style={tagStyle('rgba(45,90,45,0.12)', '#2D5A2D')}>🎥 Videos Unlocked</span>}
+              {isBeforeAfterUnlocked && <span style={tagStyle('rgba(201,146,42,0.15)', '#C9922A')}>⭐ VIP Member</span>}
             </div>
           </div>
         </div>
@@ -301,15 +274,9 @@ export default function DashboardPage() {
               <span style={{ fontSize: '18px' }}>⚠️</span>
               <span style={{ fontWeight: '700', color: '#B85C38', fontSize: '14px' }}>Injury Safety Reminders</span>
             </div>
-            {profile.injuries.toLowerCase().includes('knee') && ['❌ Avoid deep squats and jumping', '⚠️ Stop if sharp knee pain occurs', '✅ Low-impact alternatives in your plan'].map((n, i) => (
-              <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>
-            ))}
-            {profile.injuries.toLowerCase().includes('back') && ['❌ Avoid heavy deadlifts until cleared', '❌ Use planks instead of sit-ups', '⚠️ Keep spine neutral on all lifts'].map((n, i) => (
-              <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>
-            ))}
-            {profile.injuries.toLowerCase().includes('shoulder') && ['❌ Avoid overhead pressing when in pain', '❌ No upright rows', '⚠️ Prioritize rotator cuff mobility'].map((n, i) => (
-              <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>
-            ))}
+            {profile.injuries.toLowerCase().includes('knee') && ['❌ Avoid deep squats and jumping', '⚠️ Stop if sharp knee pain occurs', '✅ Low-impact alternatives in your plan'].map((n, i) => <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>)}
+            {profile.injuries.toLowerCase().includes('back') && ['❌ Avoid heavy deadlifts until cleared', '❌ Use planks instead of sit-ups', '⚠️ Keep spine neutral on all lifts'].map((n, i) => <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>)}
+            {profile.injuries.toLowerCase().includes('shoulder') && ['❌ Avoid overhead pressing when in pain', '❌ No upright rows', '⚠️ Prioritize rotator cuff mobility'].map((n, i) => <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>)}
           </div>
         )}
 
@@ -323,12 +290,7 @@ export default function DashboardPage() {
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {[1, 2].map(w => (
-                  <button key={w} onClick={() => { setWeekTab(w); setSelectedDay(0); }} style={{
-                    padding: '7px 16px', borderRadius: '8px', border: 'none',
-                    background: weekTab === w ? '#2D5A2D' : 'rgba(134,168,134,0.25)',
-                    color: weekTab === w ? '#FDFCFA' : '#1B3A2A',
-                    fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit',
-                  }}>Week {w}</button>
+                  <button key={w} onClick={() => { setWeekTab(w); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Week {w}</button>
                 ))}
               </div>
             </div>
@@ -339,13 +301,7 @@ export default function DashboardPage() {
               <>
                 <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '16px' }}>
                   {workoutDays.map((day, i) => (
-                    <button key={i} onClick={() => setSelectedDay(i)} style={{
-                      minWidth: '110px', padding: '14px 12px',
-                      background: selectedDay === i ? '#2D5A2D' : '#FDFCFA',
-                      border: `1.5px solid ${selectedDay === i ? '#2D5A2D' : 'rgba(134,168,134,0.35)'}`,
-                      borderRadius: '12px', cursor: 'pointer', textAlign: 'center',
-                      flexShrink: 0, transition: 'all 0.2s', fontFamily: 'inherit',
-                    }}>
+                    <button key={i} onClick={() => setSelectedDay(i)} style={{ minWidth: '110px', padding: '14px 12px', background: selectedDay === i ? '#2D5A2D' : '#FDFCFA', border: `1.5px solid ${selectedDay === i ? '#2D5A2D' : 'rgba(134,168,134,0.35)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'center', flexShrink: 0, transition: 'all 0.2s', fontFamily: 'inherit' }}>
                       <div style={{ fontSize: '20px', marginBottom: '4px' }}>{day.emoji || '💪'}</div>
                       <div style={{ fontSize: '12px', fontWeight: '600', color: selectedDay === i ? '#FDFCFA' : '#1B3A2A' }}>{day.day}</div>
                       <div style={{ fontSize: '11px', color: selectedDay === i ? 'rgba(253,252,250,0.7)' : '#5A7A5A', marginTop: '2px' }}>{day.duration}</div>
@@ -365,15 +321,9 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     </div>
-
                     <div style={{ height: '1px', background: 'rgba(134,168,134,0.25)', marginBottom: '16px' }} />
-
                     {(workoutDays[selectedDay].exercises || []).map((ex, i) => (
-                      <div key={i} style={{
-                        display: 'grid', gridTemplateColumns: '1fr auto auto auto',
-                        gap: '8px', padding: '12px', background: 'rgba(232,245,233,0.5)',
-                        borderRadius: '10px', marginBottom: '8px', alignItems: 'center',
-                      }}>
+                      <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: '8px', padding: '12px', background: 'rgba(232,245,233,0.5)', borderRadius: '10px', marginBottom: '8px', alignItems: 'center' }}>
                         <div>
                           <div style={{ fontSize: '14px', fontWeight: '600', color: '#1B3A2A', marginBottom: '2px' }}>{ex.name}</div>
                           <div style={{ fontSize: '11px', color: '#5A7A5A' }}>📝 {ex.notes}</div>
@@ -386,20 +336,10 @@ export default function DashboardPage() {
                         ))}
                       </div>
                     ))}
-
-                    {/* Video - unlocked for first 20 users */}
                     {isVideoUnlocked ? (
                       <div style={{ marginTop: '12px' }}>
                         {(YOUTUBE_VIDEOS[workoutDays[selectedDay].type] || YOUTUBE_VIDEOS.cardio).map((vid, i) => (
-                          <a key={i} href={vid.url} target="_blank" rel="noopener noreferrer" style={{
-                            display: 'flex', alignItems: 'center', gap: '10px',
-                            padding: '12px 16px', marginBottom: '8px',
-                            background: 'rgba(45,90,45,0.08)',
-                            border: '1px solid rgba(45,90,45,0.2)',
-                            borderRadius: '10px', textDecoration: 'none',
-                            color: '#1B3A2A', fontSize: '13px', fontWeight: '500',
-                            transition: 'all 0.2s',
-                          }}>
+                          <a key={i} href={vid.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', marginBottom: '8px', background: 'rgba(45,90,45,0.08)', border: '1px solid rgba(45,90,45,0.2)', borderRadius: '10px', textDecoration: 'none', color: '#1B3A2A', fontSize: '13px', fontWeight: '500' }}>
                             <span style={{ fontSize: '18px' }}>▶️</span>
                             <span>{vid.name}</span>
                             <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#5A7A5A' }}>YouTube →</span>
@@ -408,8 +348,7 @@ export default function DashboardPage() {
                       </div>
                     ) : (
                       <div style={{ ...lockStyle, marginTop: '12px' }}>
-                        <span>🔒</span>
-                        <span>Video Tutorial — Unlocked for first 20 beta members</span>
+                        <span>🔒</span><span>Video Tutorial — Unlocked for first 20 beta members</span>
                       </div>
                     )}
                   </div>
@@ -453,19 +392,9 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <p style={{ fontSize: '13px', color: '#4A5A4A', lineHeight: '1.6', marginBottom: '12px' }}>{meal.instructions}</p>
-
-                  {/* Cooking video - unlocked for first 20 */}
                   {isVideoUnlocked ? (
-                    <a href={MEAL_VIDEOS[meal.meal] || MEAL_VIDEOS.Breakfast} target="_blank" rel="noopener noreferrer" style={{
-                      display: 'flex', alignItems: 'center', gap: '10px',
-                      padding: '12px 16px', marginBottom: '8px',
-                      background: 'rgba(45,90,45,0.08)',
-                      border: '1px solid rgba(45,90,45,0.2)',
-                      borderRadius: '10px', textDecoration: 'none',
-                      color: '#1B3A2A', fontSize: '13px', fontWeight: '500',
-                    }}>
-                      <span>🎥</span>
-                      <span>Watch Cooking Video</span>
+                    <a href={MEAL_VIDEOS[meal.meal] || MEAL_VIDEOS.Breakfast} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'rgba(45,90,45,0.08)', border: '1px solid rgba(45,90,45,0.2)', borderRadius: '10px', textDecoration: 'none', color: '#1B3A2A', fontSize: '13px', fontWeight: '500' }}>
+                      <span>🎥</span><span>Watch Cooking Video</span>
                       <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#5A7A5A' }}>YouTube →</span>
                     </a>
                   ) : (
@@ -484,45 +413,20 @@ export default function DashboardPage() {
         {activeTab === 'progress' && (
           <div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', marginBottom: '18px' }}>📊 Progress Tracker</h2>
-
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-
-              {/* Log today */}
               <div style={cardStyle}>
                 <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '4px' }}>📝 Log Today</h3>
                 <p style={{ fontSize: '12px', color: '#5A7A5A', marginBottom: '16px', fontStyle: 'italic' }}>
                   {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                 </p>
-                {[
-                  { label: 'Weight (kg)', value: weight, set: setWeight, placeholder: 'e.g. 82.5' },
-                  { label: 'Daily Steps', value: steps, set: setSteps, placeholder: 'e.g. 7500' },
-                ].map(f => (
+                {[{ label: 'Weight (kg)', value: weight, set: setWeight, placeholder: 'e.g. 82.5' }, { label: 'Daily Steps', value: steps, set: setSteps, placeholder: 'e.g. 7500' }].map(f => (
                   <div key={f.label} style={{ marginBottom: '14px' }}>
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#5A7A5A', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '6px' }}>{f.label}</label>
-                    <input
-                      type="number" value={f.value}
-                      onChange={e => f.set(e.target.value)}
-                      placeholder={f.placeholder}
-                      style={{
-                        width: '100%', padding: '11px 14px',
-                        background: 'rgba(232,245,233,0.5)',
-                        border: '1.5px solid rgba(134,168,134,0.35)',
-                        borderRadius: '10px', color: '#1B3A2A',
-                        fontSize: '15px', fontFamily: 'inherit',
-                        boxSizing: 'border-box',
-                      }}
-                    />
+                    <input type="number" value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} style={{ width: '100%', padding: '11px 14px', background: 'rgba(232,245,233,0.5)', border: '1.5px solid rgba(134,168,134,0.35)', borderRadius: '10px', color: '#1B3A2A', fontSize: '15px', fontFamily: 'inherit', boxSizing: 'border-box' }} />
                   </div>
                 ))}
-                <button onClick={handleSaveProgress} style={{
-                  width: '100%', padding: '13px',
-                  background: progressSaved ? '#4A7A4A' : '#2D5A2D',
-                  border: 'none', borderRadius: '10px',
-                  color: '#FDFCFA', fontSize: '14px',
-                  fontWeight: '700', cursor: 'pointer',
-                  fontFamily: 'inherit', transition: 'background 0.3s',
-                }}>
-                  {progressSaved ? '✓ Saved! Ready for tomorrow.' : 'Save Today\'s Progress'}
+                <button onClick={handleSaveProgress} style={{ width: '100%', padding: '13px', background: progressSaved ? '#4A7A4A' : '#2D5A2D', border: 'none', borderRadius: '10px', color: '#FDFCFA', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.3s' }}>
+                  {progressSaved ? '✓ Saved! Ready for tomorrow.' : "Save Today's Progress"}
                 </button>
                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {['💧 Water intake tracker — Pro Only', '😴 Sleep hours tracker — Pro Only'].map((item, i) => (
@@ -531,10 +435,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Charts */}
               <div style={cardStyle}>
                 <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '16px' }}>📈 Weight History</h3>
-
                 {progressLogs.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '30px', color: '#5A7A5A', fontSize: '13px' }}>
                     <div style={{ fontSize: '32px', marginBottom: '8px' }}>📊</div>
@@ -542,7 +444,6 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <>
-                    {/* Simple bar chart */}
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '80px', marginBottom: '8px' }}>
                       {progressLogs.slice(-7).map((log, i) => {
                         const maxW = Math.max(...progressLogs.map(l => l.current_weight || 0));
@@ -552,21 +453,12 @@ export default function DashboardPage() {
                         return (
                           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                             <div style={{ fontSize: '9px', color: '#5A7A5A' }}>{log.current_weight || '—'}</div>
-                            <div style={{
-                              width: '100%', height: `${pct}px`,
-                              background: i === progressLogs.slice(-7).length - 1 ? '#2D5A2D' : 'rgba(45,90,45,0.35)',
-                              borderRadius: '4px 4px 0 0',
-                              transition: 'height 0.8s ease',
-                            }} />
-                            <div style={{ fontSize: '9px', color: '#5A7A5A' }}>
-                              {new Date(log.log_date).toLocaleDateString('en', { month: 'numeric', day: 'numeric' })}
-                            </div>
+                            <div style={{ width: '100%', height: `${pct}px`, background: i === progressLogs.slice(-7).length - 1 ? '#2D5A2D' : 'rgba(45,90,45,0.35)', borderRadius: '4px 4px 0 0', transition: 'height 0.8s ease' }} />
+                            <div style={{ fontSize: '9px', color: '#5A7A5A' }}>{new Date(log.log_date).toLocaleDateString('en', { month: 'numeric', day: 'numeric' })}</div>
                           </div>
                         );
                       })}
                     </div>
-
-                    {/* Steps chart */}
                     <div style={{ height: '1px', background: 'rgba(134,168,134,0.25)', margin: '12px 0' }} />
                     <h4 style={{ fontSize: '13px', color: '#2D5A2D', marginBottom: '8px', fontFamily: 'Georgia, serif' }}>👟 Steps History</h4>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '60px' }}>
@@ -575,14 +467,8 @@ export default function DashboardPage() {
                         const hitGoal = (log.daily_steps || 0) >= 8000;
                         return (
                           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                            <div style={{
-                              width: '100%', height: `${pct * 0.5}px`,
-                              background: hitGoal ? '#4A7A4A' : 'rgba(134,168,134,0.4)',
-                              borderRadius: '3px 3px 0 0',
-                            }} />
-                            <div style={{ fontSize: '9px', color: '#5A7A5A' }}>
-                              {new Date(log.log_date).toLocaleDateString('en', { day: 'numeric' })}
-                            </div>
+                            <div style={{ width: '100%', height: `${pct * 0.5}px`, background: hitGoal ? '#4A7A4A' : 'rgba(134,168,134,0.4)', borderRadius: '3px 3px 0 0' }} />
+                            <div style={{ fontSize: '9px', color: '#5A7A5A' }}>{new Date(log.log_date).toLocaleDateString('en', { day: 'numeric' })}</div>
                           </div>
                         );
                       })}
@@ -592,7 +478,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Weight progress bar */}
             <div style={{ ...cardStyle, marginBottom: '16px' }}>
               <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '14px' }}>🎯 Weight Goal Progress</h3>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#5A7A5A', marginBottom: '8px' }}>
@@ -601,16 +486,10 @@ export default function DashboardPage() {
                 <span>{targetW} kg goal</span>
               </div>
               <div style={{ height: '10px', background: 'rgba(134,168,134,0.25)', borderRadius: '5px', overflow: 'hidden', marginBottom: '8px' }}>
-                <div style={{
-                  height: '100%', width: `${weightProgress}%`,
-                  background: 'linear-gradient(90deg, #4A7A4A, #2D5A2D)',
-                  borderRadius: '5px', transition: 'width 1s ease',
-                }} />
+                <div style={{ height: '100%', width: `${weightProgress}%`, background: 'linear-gradient(90deg, #4A7A4A, #2D5A2D)', borderRadius: '5px', transition: 'width 1s ease' }} />
               </div>
               <div style={{ fontSize: '12px', color: '#4A7A4A' }}>
-                {currentW < startW
-                  ? `↓ ${(startW - currentW).toFixed(1)} kg lost · ${(currentW - targetW).toFixed(1)} kg remaining`
-                  : `Log your weight to track progress`}
+                {currentW < startW ? `↓ ${(startW - currentW).toFixed(1)} kg lost · ${(currentW - targetW).toFixed(1)} kg remaining` : 'Log your weight to track progress'}
               </div>
             </div>
           </div>
@@ -620,12 +499,8 @@ export default function DashboardPage() {
         {activeTab === 'photos' && (
           <div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', marginBottom: '16px' }}>📸 Your Progress Photos</h2>
-
-            {/* Starting photos */}
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
-                Week 1 — Starting Point
-              </div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>Week 1 — Starting Point</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
                 {['front', 'back', 'left', 'right'].map(type => {
                   const photo = photos.find(p => p.photo_type === type && p.week_number === 1);
@@ -646,7 +521,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Before/After — unlocked for first 5 users */}
             {isBeforeAfterUnlocked ? (
               <div style={{ ...cardStyle, background: 'rgba(45,90,45,0.06)', border: '1px solid rgba(45,90,45,0.2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
@@ -664,11 +538,7 @@ export default function DashboardPage() {
                           {[{ photo: week1, label: 'Before' }, { photo: latest, label: 'After' }].map(({ photo, label }) => (
                             <div key={label} style={{ position: 'relative' }}>
                               <div style={{ ...cardStyle, aspectRatio: '3/4', padding: '4px', overflow: 'hidden' }}>
-                                {photo ? (
-                                  <img src={photo.photo_url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
-                                ) : (
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5A7A5A', fontSize: '11px' }}>No photo</div>
-                                )}
+                                {photo ? <img src={photo.photo_url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5A7A5A', fontSize: '11px' }}>No photo</div>}
                               </div>
                               <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: '600', color: '#2D5A2D', marginTop: '4px' }}>{label}</div>
                             </div>
@@ -683,16 +553,58 @@ export default function DashboardPage() {
               <div style={{ ...cardStyle, textAlign: 'center', padding: '32px' }}>
                 <div style={{ fontSize: '32px', marginBottom: '10px' }}>🔒</div>
                 <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '6px' }}>Before/After Comparison</h3>
-                <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px' }}>
-                  Unlocked for the first 5 beta members
-                </p>
-                <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>
-                  You are Beta Member #{profile?.beta_number} — Join waitlist below to unlock Pro features
-                </span>
+                <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px' }}>Unlocked for the first 5 beta members</p>
+                <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>You are Beta Member #{profile?.beta_number} — Join waitlist below to unlock Pro features</span>
               </div>
             )}
           </div>
         )}
+
+        {/* REGENERATE PLAN — LOCKED FOR BETA */}
+        <div style={{ marginTop: '24px', ...cardStyle, position: 'relative', overflow: 'hidden' }}>
+          {/* Lock overlay */}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(245,240,232,0.92)', backdropFilter: 'blur(3px)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', borderRadius: '14px', padding: '24px', textAlign: 'center' }}>
+            <div style={{ fontSize: '36px' }}>🔒</div>
+            <div style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1B3A2A', fontWeight: '700' }}>Plan Regeneration — Pro Feature</div>
+            <div style={{ fontSize: '13px', color: '#5A7A5A', maxWidth: '280px', lineHeight: '1.6' }}>
+              Update your schedule, dates and daily routine then regenerate your AI plan anytime. Available when Champions Park Pro launches.
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(201,146,42,0.12)', border: '1px solid rgba(201,146,42,0.3)', borderRadius: '20px', padding: '8px 20px', fontSize: '13px', fontWeight: '600', color: '#C9922A' }}>
+              🚀 Join waitlist below to get early access
+            </div>
+          </div>
+
+          {/* Blurred preview behind overlay */}
+          <div style={{ filter: 'blur(2px)', pointerEvents: 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <span style={{ fontSize: '22px' }}>🔄</span>
+              <div>
+                <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1B3A2A', margin: 0 }}>Regenerate Your Plan</h3>
+                <p style={{ fontSize: '12px', color: '#5A7A5A', margin: 0, fontStyle: 'italic' }}>Update your schedule and generate a fresh AI plan</p>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+              {[
+                { label: 'Workout Start Time', type: 'time', key: 'workout_start' },
+                { label: 'Workout End Time', type: 'time', key: 'workout_end' },
+                { label: 'Plan Start Date', type: 'date', key: 'plan_start_date' },
+                { label: 'Plan End Date', type: 'date', key: 'plan_end_date' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#5A7A5A', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '5px' }}>{f.label}</label>
+                  <input type={f.type} style={inputS} value={regenSchedule[f.key]} onChange={e => setRegenSchedule({ ...regenSchedule, [f.key]: e.target.value })} />
+                </div>
+              ))}
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#5A7A5A', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '5px' }}>Updated Daily Routine & Notes</label>
+              <textarea style={{ ...inputS, height: '80px', resize: 'vertical' }} value={regenSchedule.daily_routine} onChange={e => setRegenSchedule({ ...regenSchedule, daily_routine: e.target.value })} placeholder="Describe any changes to your routine or schedule..." />
+            </div>
+            <button style={{ width: '100%', padding: '13px', background: '#2D5A2D', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '15px', fontWeight: '700', cursor: 'not-allowed', fontFamily: 'inherit', opacity: 0.5 }}>
+              🔄 Regenerate My Plan
+            </button>
+          </div>
+        </div>
 
         {/* MOTIVATION */}
         <div style={{ ...cardStyle, marginTop: '24px', borderLeft: '4px solid #4A7A4A' }}>
@@ -723,30 +635,14 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <input
-                type="email" value={waitEmail}
-                onChange={e => setWaitEmail(e.target.value)}
-                placeholder="your@email.com"
-                style={{
-                  flex: 1, minWidth: '200px', padding: '13px 16px',
-                  background: 'rgba(253,252,250,0.08)',
-                  border: '1px solid rgba(253,252,250,0.15)',
-                  borderRadius: '10px', color: '#FDFCFA',
-                  fontSize: '15px', fontFamily: 'inherit',
-                }}
-              />
-              <button onClick={handleWaitlist} disabled={waitLoading} style={{
-                padding: '13px 24px', background: '#4A7A4A',
-                border: 'none', borderRadius: '10px',
-                color: '#FDFCFA', fontSize: '14px',
-                fontWeight: '700', cursor: waitLoading ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit', whiteSpace: 'nowrap',
-              }}>
+              <input type="email" value={waitEmail} onChange={e => setWaitEmail(e.target.value)} placeholder="your@email.com" style={{ flex: 1, minWidth: '200px', padding: '13px 16px', background: 'rgba(253,252,250,0.08)', border: '1px solid rgba(253,252,250,0.15)', borderRadius: '10px', color: '#FDFCFA', fontSize: '15px', fontFamily: 'inherit' }} />
+              <button onClick={handleWaitlist} disabled={waitLoading} style={{ padding: '13px 24px', background: '#4A7A4A', border: 'none', borderRadius: '10px', color: '#FDFCFA', fontSize: '14px', fontWeight: '700', cursor: waitLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                 {waitLoading ? 'Joining...' : 'Join Waitlist'}
               </button>
             </div>
           )}
         </div>
+
         <div style={{ height: '40px' }} />
       </div>
     </div>
