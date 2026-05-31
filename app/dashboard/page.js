@@ -25,6 +25,14 @@ const MEAL_VIDEOS = {
   Snack: 'https://www.youtube.com/watch?v=8MjBzou2P_I',
 };
 
+// Day name translation map — maps English day names from AI plan to translation keys
+const DAY_MAP = {
+  'monday': 'mondayFull', 'tuesday': 'tuesdayFull', 'wednesday': 'wednesdayFull',
+  'thursday': 'thursdayFull', 'friday': 'fridayFull', 'saturday': 'saturdayFull', 'sunday': 'sundayFull',
+  'Monday': 'mondayFull', 'Tuesday': 'tuesdayFull', 'Wednesday': 'wednesdayFull',
+  'Thursday': 'thursdayFull', 'Friday': 'fridayFull', 'Saturday': 'saturdayFull', 'Sunday': 'sundayFull',
+};
+
 const QUOTES = {
   weight_loss: {
     en: [
@@ -38,16 +46,19 @@ const QUOTES = {
       { quote: 'كل تمرين هو تقدم. كل وجبة صحية هي انتصار.', author: 'بارك أبطال' },
       { quote: 'جسدك يحقق ما يؤمن به عقلك.', author: 'بارك أبطال' },
       { quote: 'الألم الذي تشعر به اليوم هو القوة التي ستشعر بها غداً.', author: 'بارك أبطال' },
+      { quote: 'النجاح هو مجموع الجهود الصغيرة المتكررة كل يوم.', author: 'بارك أبطال' },
     ],
     ku: [
       { quote: 'هەر ورزشێک پێشکەوتنە. هەر خواردنێکی تەندروست سەرکەوتنێکە.', author: 'پارکی شامپیۆنان' },
       { quote: 'جەستەکەت ئەوەی دەبەخشێت کە دەتەوێ.', author: 'پارکی شامپیۆنان' },
       { quote: 'ئێشی ئەمڕۆ هێزی سبەیە.', author: 'پارکی شامپیۆنان' },
+      { quote: 'سەرکەوتن کۆی هەوڵە بچووکەکانی هەموو ڕۆژە.', author: 'پارکی شامپیۆنان' },
     ],
     tr: [
       { quote: 'Her antrenman bir ilerleme. Her sağlıklı öğün bir zafer.', author: 'Champions Park' },
       { quote: 'Vücudun, zihninin inandığını başarır.', author: 'Champions Park' },
       { quote: 'Bugün hissettiğin acı yarın hissedeceğin güç olacak.', author: 'Champions Park' },
+      { quote: 'Başarı, her gün tekrarlanan küçük çabaların toplamıdır.', author: 'Champions Park' },
     ],
   },
   bodybuilding: {
@@ -56,7 +67,6 @@ const QUOTES = {
       { quote: 'Strength is built in the moments you push through when you want to stop.', author: 'Champions Park' },
       { quote: 'The last few reps are what makes the muscle grow.', author: 'Arnold Schwarzenegger' },
       { quote: 'Pain is temporary. Glory is forever.', author: 'Champions Park' },
-      { quote: 'If it does not challenge you, it will not change you.', author: 'Fred DeVito' },
     ],
     ar: [
       { quote: 'الحديد يصقل الحديد. كل تكرار يبني البطل الذي تصبحه.', author: 'بارك أبطال' },
@@ -95,13 +105,6 @@ export default function DashboardPage() {
   const [waitLoading, setWaitLoading] = useState(false);
   const [userId, setUserId] = useState(null);
   const [language, setLanguage] = useState('en');
-  const [regenSchedule, setRegenSchedule] = useState({
-    workout_start: '07:00',
-    workout_end: '08:00',
-    plan_start_date: new Date().toISOString().split('T')[0],
-    plan_end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    daily_routine: '',
-  });
 
   const t = (key) => {
     const lang = translations[language] || translations['en'];
@@ -109,6 +112,14 @@ export default function DashboardPage() {
   };
   const dir = translations[language]?.dir || 'ltr';
   const isRTL = dir === 'rtl';
+
+  // Translate day name from English AI plan to current language
+  const translateDay = (dayName) => {
+    if (!dayName) return dayName;
+    const key = DAY_MAP[dayName] || DAY_MAP[dayName?.toLowerCase()];
+    if (key) return t(key);
+    return dayName;
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -121,7 +132,6 @@ export default function DashboardPage() {
       if (!profileData) { router.push('/onboarding'); return; }
       setProfile(profileData);
 
-      // Load language
       if (profileData.language && translations[profileData.language]) {
         setLanguage(profileData.language);
         document.documentElement.dir = translations[profileData.language]?.dir || 'ltr';
@@ -169,8 +179,7 @@ export default function DashboardPage() {
     const data = await res.json();
     if (data.success) {
       setProgressSaved(true);
-      setWeight('');
-      setSteps('');
+      setWeight(''); setSteps('');
       const { data: logs } = await supabase
         .from('progress_logs').select('*').eq('user_id', userId)
         .order('log_date', { ascending: true });
@@ -197,7 +206,7 @@ export default function DashboardPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
         <div style={{ fontSize: '40px' }}>🏆</div>
-        <div style={{ fontSize: '16px', color: '#5A7A5A', fontFamily: 'Georgia, serif' }}>Loading your dashboard...</div>
+        <div style={{ fontSize: '16px', color: '#5A7A5A', fontFamily: 'Georgia, serif' }}>Loading...</div>
       </div>
     );
   }
@@ -208,7 +217,6 @@ export default function DashboardPage() {
   const meals = plan?.meal_plan?.meals || [];
   const targets = plan?.weekly_targets || {};
 
-  // Get quote in user's language
   const goalKey = profile?.goal_type === 'bodybuilding' ? 'bodybuilding' : 'weight_loss';
   const quoteList = QUOTES[goalKey][language] || QUOTES[goalKey]['en'];
   const todayQuote = quoteList[new Date().getDate() % quoteList.length];
@@ -218,53 +226,26 @@ export default function DashboardPage() {
   const latestLog = progressLogs[progressLogs.length - 1];
   const currentW = latestLog?.current_weight || startW;
   const weightProgress = startW && targetW && startW !== targetW
-    ? Math.min(((startW - currentW) / (startW - targetW)) * 100, 100)
-    : 0;
+    ? Math.min(((startW - currentW) / (startW - targetW)) * 100, 100) : 0;
   const isVideoUnlocked = (profile?.beta_number || 999) <= 20;
   const isBeforeAfterUnlocked = (profile?.beta_number || 999) <= 5;
 
-  const cardStyle = {
-    background: '#FDFCFA',
-    border: '1px solid rgba(134,168,134,0.3)',
-    borderRadius: '14px',
-    boxShadow: '0 4px 16px rgba(27,58,42,0.08)',
-    padding: '20px',
-  };
+  const proFeatureKeys = ['proFeature1','proFeature2','proFeature3','proFeature4','proFeature5','proFeature6','proFeature7','proFeature8'];
 
+  const cardStyle = {
+    background: '#FDFCFA', border: '1px solid rgba(134,168,134,0.3)',
+    borderRadius: '14px', boxShadow: '0 4px 16px rgba(27,58,42,0.08)', padding: '20px',
+  };
   const tagStyle = (bg, color) => ({
     display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '4px 12px', borderRadius: '20px',
-    fontSize: '12px', fontWeight: '600',
+    padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
     background: bg, color: color,
   });
-
   const lockStyle = {
-    background: 'rgba(232,245,233,0.8)',
-    border: '1px dashed rgba(134,168,134,0.4)',
-    borderRadius: '10px', padding: '14px',
-    display: 'flex', alignItems: 'center',
+    background: 'rgba(232,245,233,0.8)', border: '1px dashed rgba(134,168,134,0.4)',
+    borderRadius: '10px', padding: '14px', display: 'flex', alignItems: 'center',
     gap: '10px', fontSize: '13px', color: '#5A7A5A',
   };
-
-  const inputS = {
-    width: '100%', padding: '10px 14px',
-    background: 'rgba(134,168,134,0.08)',
-    border: '1.5px solid rgba(134,168,134,0.3)',
-    borderRadius: '10px', color: '#1B3A2A',
-    fontSize: '14px', fontFamily: 'inherit',
-    boxSizing: 'border-box',
-  };
-
-  const proFeatures = [
-    'Full 8-week AI workout plan',
-    'Complete meal plan with macros',
-    'YouTube tutorials for every exercise',
-    'Cooking videos for every meal',
-    'Before/after photo comparison',
-    'Advanced analytics dashboard',
-    'AI plan regeneration monthly',
-    'Bodybuilder bulk/cut cycle planner',
-  ];
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 50%, #E8F5E9 100%)', fontFamily: 'Georgia, system-ui, sans-serif', direction: dir }}>
@@ -276,12 +257,7 @@ export default function DashboardPage() {
           <span style={{ fontFamily: 'Georgia, serif', fontSize: '18px', fontWeight: '700', color: '#1B3A2A' }}>Champions Park</span>
         </div>
         <div style={{ display: 'flex', gap: '4px', overflowX: 'auto' }}>
-          {[
-            ['plan', `🗓 ${t('tabPlan')}`],
-            ['meals', `🍽 ${t('tabMeals')}`],
-            ['progress', `📊 ${t('tabProgress')}`],
-            ['photos', `📸 ${t('tabPhotos')}`],
-          ].map(([tab, label]) => (
+          {[['plan', `🗓 ${t('tabPlan')}`], ['meals', `🍽 ${t('tabMeals')}`], ['progress', `📊 ${t('tabProgress')}`], ['photos', `📸 ${t('tabPhotos')}`]].map(([tab, label]) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '7px 14px', borderRadius: '8px', border: 'none', background: activeTab === tab ? '#2D5A2D' : 'transparent', color: activeTab === tab ? '#FDFCFA' : '#5A7A5A', fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
               {label}
             </button>
@@ -309,8 +285,8 @@ export default function DashboardPage() {
                 {isBuild ? `💪 ${t('goalMuscle')}` : `🔥 ${t('goalWeightLoss')}`}
               </span>
               <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>🏅 {t('betaMemberBadge')} #{profile?.beta_number || '—'}</span>
-              {isVideoUnlocked && <span style={tagStyle('rgba(45,90,45,0.12)', '#2D5A2D')}>🎥 Videos Unlocked</span>}
-              {isBeforeAfterUnlocked && <span style={tagStyle('rgba(201,146,42,0.15)', '#C9922A')}>⭐ VIP Member</span>}
+              {isVideoUnlocked && <span style={tagStyle('rgba(45,90,45,0.12)', '#2D5A2D')}>🎥 {t('videosUnlocked')}</span>}
+              {isBeforeAfterUnlocked && <span style={tagStyle('rgba(201,146,42,0.15)', '#C9922A')}>⭐ {t('vipMember')}</span>}
             </div>
           </div>
         </div>
@@ -332,16 +308,28 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* INJURY CARD */}
+        {/* INJURY CARD — FULLY TRANSLATED */}
         {profile?.injuries && (
           <div style={{ marginBottom: '20px', background: 'rgba(184,92,56,0.06)', border: '1px solid rgba(184,92,56,0.2)', borderRadius: '14px', padding: '16px 20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
               <span style={{ fontSize: '18px' }}>⚠️</span>
-              <span style={{ fontWeight: '700', color: '#B85C38', fontSize: '14px' }}>Injury Safety Reminders</span>
+              <span style={{ fontWeight: '700', color: '#B85C38', fontSize: '14px' }}>{t('injurySafetyTitle')}</span>
             </div>
-            {profile.injuries.toLowerCase().includes('knee') && ['❌ Avoid deep squats and jumping', '⚠️ Stop if sharp knee pain occurs', '✅ Low-impact alternatives in your plan'].map((n, i) => <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>)}
-            {profile.injuries.toLowerCase().includes('back') && ['❌ Avoid heavy deadlifts until cleared', '❌ Use planks instead of sit-ups', '⚠️ Keep spine neutral on all lifts'].map((n, i) => <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>)}
-            {profile.injuries.toLowerCase().includes('shoulder') && ['❌ Avoid overhead pressing when in pain', '❌ No upright rows', '⚠️ Prioritize rotator cuff mobility'].map((n, i) => <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>)}
+            {profile.injuries.toLowerCase().includes('knee') && (
+              [t('injuryKnee1'), t('injuryKnee2'), t('injuryKnee3')].map((n, i) => (
+                <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>
+              ))
+            )}
+            {profile.injuries.toLowerCase().includes('back') && (
+              [t('injuryBack1'), t('injuryBack2'), t('injuryBack3')].map((n, i) => (
+                <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>
+              ))
+            )}
+            {profile.injuries.toLowerCase().includes('shoulder') && (
+              [t('injuryShoulder1'), t('injuryShoulder2'), t('injuryShoulder3')].map((n, i) => (
+                <div key={i} style={{ fontSize: '13px', color: '#4A3030', marginBottom: '3px' }}>{n}</div>
+              ))
+            )}
           </div>
         )}
 
@@ -351,27 +339,29 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A' }}>🗓 {t('yourWorkoutPlan')}</h2>
-                <p style={{ fontSize: '13px', color: '#5A7A5A', fontStyle: 'italic' }}>Personalized by Claude AI for your goal</p>
+                <p style={{ fontSize: '13px', color: '#5A7A5A', fontStyle: 'italic' }}>{t('personalizedBy')}</p>
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-  {Array.from(
-    { length: plan?.workout_plan?.weeks?.length || 2 },
-    (_, i) => i + 1
-  ).map(w => (
-    <button key={w} onClick={() => { setWeekTab(w); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>{t('week')} {w}</button>
-  ))}
-</div>
+                {Array.from({ length: plan?.workout_plan?.weeks?.length || 2 }, (_, i) => i + 1).map(w => (
+                  <button key={w} onClick={() => { setWeekTab(w); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {t('week')} {w}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {workoutDays.length === 0 ? (
-              <div style={{ ...cardStyle, textAlign: 'center', padding: '40px', color: '#5A7A5A' }}>No workout days found for this week.</div>
+              <div style={{ ...cardStyle, textAlign: 'center', padding: '40px', color: '#5A7A5A' }}>{t('noWorkoutDays')}</div>
             ) : (
               <>
+                {/* Day selector — day names translated */}
                 <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '16px' }}>
                   {workoutDays.map((day, i) => (
                     <button key={i} onClick={() => setSelectedDay(i)} style={{ minWidth: '110px', padding: '14px 12px', background: selectedDay === i ? '#2D5A2D' : '#FDFCFA', border: `1.5px solid ${selectedDay === i ? '#2D5A2D' : 'rgba(134,168,134,0.35)'}`, borderRadius: '12px', cursor: 'pointer', textAlign: 'center', flexShrink: 0, transition: 'all 0.2s', fontFamily: 'inherit' }}>
                       <div style={{ fontSize: '20px', marginBottom: '4px' }}>{day.emoji || '💪'}</div>
-                      <div style={{ fontSize: '12px', fontWeight: '600', color: selectedDay === i ? '#FDFCFA' : '#1B3A2A' }}>{day.day}</div>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: selectedDay === i ? '#FDFCFA' : '#1B3A2A' }}>
+                        {translateDay(day.day)}
+                      </div>
                       <div style={{ fontSize: '11px', color: selectedDay === i ? 'rgba(253,252,250,0.7)' : '#5A7A5A', marginTop: '2px' }}>{day.duration}</div>
                     </button>
                   ))}
@@ -396,7 +386,7 @@ export default function DashboardPage() {
                           <div style={{ fontSize: '14px', fontWeight: '600', color: '#1B3A2A', marginBottom: '2px' }}>{ex.name}</div>
                           <div style={{ fontSize: '11px', color: '#5A7A5A' }}>📝 {ex.notes}</div>
                         </div>
-                        {[[t('sets'), ex.sets], [t('reps'), ex.reps], ['Rest', ex.rest]].map(([lbl, val]) => (
+                        {[[t('sets'), ex.sets], [t('reps'), ex.reps], [t('rest'), ex.rest]].map(([lbl, val]) => (
                           <div key={lbl} style={{ textAlign: 'center', minWidth: '44px' }}>
                             <div style={{ fontSize: '10px', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{lbl}</div>
                             <div style={{ fontSize: '14px', fontWeight: '700', color: '#1B3A2A' }}>{val}</div>
@@ -416,7 +406,7 @@ export default function DashboardPage() {
                       </div>
                     ) : (
                       <div style={{ ...lockStyle, marginTop: '12px' }}>
-                        <span>🔒</span><span>Video Tutorial — Unlocked for first 20 beta members</span>
+                        <span>🔒</span><span>{t('videoTutorial')}</span>
                       </div>
                     )}
                   </div>
@@ -433,14 +423,14 @@ export default function DashboardPage() {
               <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', marginBottom: '8px' }}>🍽 {t('todaysMeal')}</h2>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>🔥 {targets.calories_per_day || '—'} cal/day</span>
-                <span style={tagStyle('rgba(45,90,45,0.1)', '#2D5A2D')}>💪 {targets.protein_grams || '—'}g protein</span>
+                <span style={tagStyle('rgba(45,90,45,0.1)', '#2D5A2D')}>💪 {targets.protein_grams || '—'}g {t('protein')}</span>
               </div>
             </div>
             {meals.length === 0 ? (
-              <div style={{ ...cardStyle, textAlign: 'center', padding: '40px', color: '#5A7A5A' }}>No meal plan found.</div>
+              <div style={{ ...cardStyle, textAlign: 'center', padding: '40px', color: '#5A7A5A' }}>{t('noMealPlan')}</div>
             ) : (
               meals.map((meal, i) => (
-                <div key={i} style={{ ...cardStyle, marginBottom: '14px', borderLeft: '4px solid #4A7A4A' }}>
+                <div key={i} style={{ ...cardStyle, marginBottom: '14px', borderLeft: isRTL ? 'none' : '4px solid #4A7A4A', borderRight: isRTL ? '4px solid #4A7A4A' : 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
                       <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '2px' }}>{meal.meal}</div>
@@ -452,7 +442,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div style={{ marginBottom: '10px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Ingredients</div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>{t('ingredients')}</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {(meal.ingredients || []).map((ing, j) => (
                         <span key={j} style={{ fontSize: '12px', background: 'rgba(232,245,233,0.8)', border: '1px solid rgba(134,168,134,0.3)', borderRadius: '6px', padding: '3px 8px', color: '#2D5A2D' }}>{ing}</span>
@@ -462,12 +452,12 @@ export default function DashboardPage() {
                   <p style={{ fontSize: '13px', color: '#4A5A4A', lineHeight: '1.6', marginBottom: '12px' }}>{meal.instructions}</p>
                   {isVideoUnlocked ? (
                     <a href={MEAL_VIDEOS[meal.meal] || MEAL_VIDEOS.Breakfast} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: 'rgba(45,90,45,0.08)', border: '1px solid rgba(45,90,45,0.2)', borderRadius: '10px', textDecoration: 'none', color: '#1B3A2A', fontSize: '13px', fontWeight: '500' }}>
-                      <span>🎥</span><span>Watch Cooking Video</span>
+                      <span>🎥</span><span>{t('watchCookingVideo')}</span>
                       <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#5A7A5A' }}>YouTube →</span>
                     </a>
                   ) : (
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <div style={{ ...lockStyle, flex: 1 }}><span>🔒</span><span>Cooking Video — First 20 members</span></div>
+                      <div style={{ ...lockStyle, flex: 1 }}><span>🔒</span><span>{t('cookingVideoLocked')}</span></div>
                       <div style={{ ...lockStyle, flex: 1 }}><span>🔒</span><span>{t('fullMealPlanLocked')}</span></div>
                     </div>
                   )}
@@ -485,12 +475,9 @@ export default function DashboardPage() {
               <div style={cardStyle}>
                 <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '4px' }}>📝 {t('logProgress')}</h3>
                 <p style={{ fontSize: '12px', color: '#5A7A5A', marginBottom: '16px', fontStyle: 'italic' }}>
-                  {new Date().toLocaleDateString(language === 'ar' ? 'ar-SA' : language === 'tr' ? 'tr-TR' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  {new Date().toLocaleDateString(language === 'ar' ? 'ar-SA' : language === 'tr' ? 'tr-TR' : language === 'ku' ? 'ar-IQ' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                 </p>
-                {[
-                  { label: t('currentWeight'), value: weight, set: setWeight, placeholder: 'e.g. 82.5' },
-                  { label: t('steps'), value: steps, set: setSteps, placeholder: 'e.g. 7500' },
-                ].map(f => (
+                {[{ label: t('currentWeight'), value: weight, set: setWeight, placeholder: 'e.g. 82.5' }, { label: t('steps'), value: steps, set: setSteps, placeholder: 'e.g. 7500' }].map(f => (
                   <div key={f.label} style={{ marginBottom: '14px' }}>
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#5A7A5A', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '6px' }}>{f.label}</label>
                     <input type="number" value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder} style={{ width: '100%', padding: '11px 14px', background: 'rgba(232,245,233,0.5)', border: '1.5px solid rgba(134,168,134,0.35)', borderRadius: '10px', color: '#1B3A2A', fontSize: '15px', fontFamily: 'inherit', boxSizing: 'border-box', direction: 'ltr' }} />
@@ -500,7 +487,7 @@ export default function DashboardPage() {
                   {progressSaved ? `✓ ${t('progressLogged')}` : t('logButton')}
                 </button>
                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {['💧 Water intake tracker — Pro Only', '😴 Sleep hours tracker — Pro Only'].map((item, i) => (
+                  {[t('waterTracker'), t('sleepTracker')].map((item, i) => (
                     <div key={i} style={lockStyle}><span>{item}</span></div>
                   ))}
                 </div>
@@ -560,7 +547,7 @@ export default function DashboardPage() {
                 <div style={{ height: '100%', width: `${weightProgress}%`, background: 'linear-gradient(90deg, #4A7A4A, #2D5A2D)', borderRadius: '5px', transition: 'width 1s ease' }} />
               </div>
               <div style={{ fontSize: '12px', color: '#4A7A4A' }}>
-                {currentW < startW ? `↓ ${(startW - currentW).toFixed(1)} kg ${t('weightLost')} · ${(currentW - targetW).toFixed(1)} kg remaining` : t('noProgressYet')}
+                {currentW < startW ? `↓ ${(startW - currentW).toFixed(1)} kg ${t('weightLost')}` : t('noProgressYet')}
               </div>
             </div>
           </div>
@@ -571,10 +558,11 @@ export default function DashboardPage() {
           <div>
             <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A', marginBottom: '16px' }}>📸 {t('myPhotos')}</h2>
             <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>Week 1 — Starting Point</div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: '#5A7A5A', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>{t('startingPoint')}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '16px' }}>
                 {['front', 'back', 'left', 'right'].map(type => {
                   const photo = photos.find(p => p.photo_type === type && p.week_number === 1);
+                  const viewLabel = type === 'front' ? t('frontView') : type === 'back' ? t('backView') : type === 'left' ? t('leftView') : t('rightView');
                   return (
                     <div key={type} style={{ ...cardStyle, aspectRatio: '3/4', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '6px', overflow: 'hidden' }}>
                       {photo ? (
@@ -582,10 +570,10 @@ export default function DashboardPage() {
                       ) : (
                         <>
                           <span style={{ fontSize: '24px' }}>📷</span>
-                          <span style={{ fontSize: '11px', color: '#5A7A5A', fontWeight: '600', textTransform: 'capitalize' }}>{type}</span>
+                          <span style={{ fontSize: '11px', color: '#5A7A5A', fontWeight: '600' }}>{viewLabel}</span>
                         </>
                       )}
-                      <div style={{ fontSize: '10px', color: '#5A7A5A', textAlign: 'center' }}>{type} view</div>
+                      <div style={{ fontSize: '10px', color: '#5A7A5A', textAlign: 'center' }}>{viewLabel}</div>
                     </div>
                   );
                 })}
@@ -596,7 +584,7 @@ export default function DashboardPage() {
               <div style={{ ...cardStyle, background: 'rgba(45,90,45,0.06)', border: '1px solid rgba(45,90,45,0.2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
                   <span style={{ fontSize: '20px' }}>⭐</span>
-                  <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A' }}>Before & After Comparison — VIP Unlocked!</h3>
+                  <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A' }}>{t('beforeAfterVIP')}</h3>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   {['front', 'back'].map(type => {
@@ -604,12 +592,14 @@ export default function DashboardPage() {
                     const latest = photos.filter(p => p.photo_type === type).sort((a, b) => b.week_number - a.week_number)[0];
                     return (
                       <div key={type}>
-                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#2D5A2D', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px', textAlign: 'center' }}>{type} view</div>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#2D5A2D', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px', textAlign: 'center' }}>
+                          {type === 'front' ? t('frontView') : t('backView')}
+                        </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                           {[{ photo: week1, label: 'Before' }, { photo: latest, label: 'After' }].map(({ photo, label }) => (
                             <div key={label} style={{ position: 'relative' }}>
                               <div style={{ ...cardStyle, aspectRatio: '3/4', padding: '4px', overflow: 'hidden' }}>
-                                {photo ? <img src={photo.photo_url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5A7A5A', fontSize: '11px' }}>No photo</div>}
+                                {photo ? <img src={photo.photo_url} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#5A7A5A', fontSize: '11px' }}>{t('noPhotoUploaded')}</div>}
                               </div>
                               <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: '600', color: '#2D5A2D', marginTop: '4px' }}>{label}</div>
                             </div>
@@ -624,8 +614,8 @@ export default function DashboardPage() {
               <div style={{ ...cardStyle, textAlign: 'center', padding: '32px' }}>
                 <div style={{ fontSize: '32px', marginBottom: '10px' }}>🔒</div>
                 <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '16px', color: '#1B3A2A', marginBottom: '6px' }}>{t('beforeAfterLocked')}</h3>
-                <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px' }}>Unlocked for the first 5 beta members</p>
-                <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>You are Beta Member #{profile?.beta_number} — {t('lockedDesc')}</span>
+                <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px' }}>{t('lockedDesc')}</p>
+                <span style={tagStyle('rgba(201,146,42,0.12)', '#C9922A')}>{t('betaMemberNumber')} #{profile?.beta_number}</span>
               </div>
             )}
           </div>
@@ -636,9 +626,7 @@ export default function DashboardPage() {
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(245,240,232,0.92)', backdropFilter: 'blur(3px)', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', borderRadius: '14px', padding: '24px', textAlign: 'center' }}>
             <div style={{ fontSize: '36px' }}>🔒</div>
             <div style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1B3A2A', fontWeight: '700' }}>{t('regenerateLocked')}</div>
-            <div style={{ fontSize: '13px', color: '#5A7A5A', maxWidth: '280px', lineHeight: '1.6' }}>
-              {t('lockedDesc')}
-            </div>
+            <div style={{ fontSize: '13px', color: '#5A7A5A', maxWidth: '280px', lineHeight: '1.6' }}>{t('lockedDesc')}</div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(201,146,42,0.12)', border: '1px solid rgba(201,146,42,0.3)', borderRadius: '20px', padding: '8px 20px', fontSize: '13px', fontWeight: '600', color: '#C9922A' }}>
               🚀 {t('joinWaitlist')}
             </div>
@@ -648,7 +636,7 @@ export default function DashboardPage() {
               <span style={{ fontSize: '22px' }}>🔄</span>
               <div>
                 <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '18px', color: '#1B3A2A', margin: 0 }}>{t('regeneratePlan')}</h3>
-                <p style={{ fontSize: '12px', color: '#5A7A5A', margin: 0, fontStyle: 'italic' }}>Update your schedule and generate a fresh AI plan</p>
+                <p style={{ fontSize: '12px', color: '#5A7A5A', margin: 0, fontStyle: 'italic' }}>{t('updateSchedule')}</p>
               </div>
             </div>
             <button style={{ width: '100%', padding: '13px', background: '#2D5A2D', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '15px', fontWeight: '700', cursor: 'not-allowed', fontFamily: 'inherit', opacity: 0.5 }}>
@@ -669,12 +657,12 @@ export default function DashboardPage() {
         {/* PRO WAITLIST */}
         <div style={{ marginTop: '24px', background: '#1B3A2A', borderRadius: '20px', padding: '32px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', borderRadius: '50%', background: 'rgba(134,168,134,0.08)', pointerEvents: 'none' }} />
-          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', color: '#FDFCFA', marginBottom: '6px' }}>🚀 Champions Park Pro — Coming Soon</h2>
+          <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '22px', color: '#FDFCFA', marginBottom: '6px' }}>🚀 {t('proComingSoon')}</h2>
           <p style={{ fontSize: '14px', color: 'rgba(253,252,250,0.6)', fontStyle: 'italic', marginBottom: '20px' }}>{t('lockedDesc')}</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', marginBottom: '24px' }}>
-            {proFeatures.map((f, i) => (
+            {proFeatureKeys.map((key, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'rgba(253,252,250,0.85)' }}>
-                <span style={{ color: '#86A886' }}>✓</span> {f}
+                <span style={{ color: '#86A886' }}>✓</span> {t(key)}
               </div>
             ))}
           </div>
@@ -682,7 +670,7 @@ export default function DashboardPage() {
             <div style={{ background: 'rgba(134,168,134,0.15)', border: '1px solid rgba(134,168,134,0.3)', borderRadius: '12px', padding: '16px', textAlign: 'center', color: '#FDFCFA' }}>
               <div style={{ fontSize: '22px', marginBottom: '6px' }}>✅</div>
               <div style={{ fontWeight: '600', marginBottom: '2px' }}>{t('waitlistSuccess')} #{waitPosition}</div>
-              <div style={{ fontSize: '12px', color: 'rgba(253,252,250,0.5)' }}>{waitPosition} champions already waiting</div>
+              <div style={{ fontSize: '12px', color: 'rgba(253,252,250,0.5)' }}>{waitPosition} {t('championsWaiting')}</div>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
