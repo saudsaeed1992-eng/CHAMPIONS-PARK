@@ -173,7 +173,7 @@ export default function HomePage() {
 
         {/* Hero */}
         <div style={{ textAlign: 'center', marginBottom: '28px', maxWidth: '420px' }}>
-          <div style={{ fontSize: '48px', marginBottom: '8px' }}>🏆</div>
+          <img src="/logo.svg" alt="Champions Park" style={{ width: '80px', height: '80px', marginBottom: '8px' }} />
           <h1 style={{ fontSize: '34px', fontWeight: '800', color: '#1B3A2A', marginBottom: '6px', fontFamily: 'Georgia, serif' }}>
             Champions Park
           </h1>
