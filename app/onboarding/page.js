@@ -238,7 +238,7 @@ export default function OnboardingPage() {
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div style={{ fontSize: '30px', marginBottom: '4px' }}>🏆</div>
+          <img src="/logo.svg" alt="Champions Park" style={{ width: '50px', height: '50px', marginBottom: '4px' }} />
           <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '24px', color: '#1B3A2A', margin: 0 }}>Champions Park</h1>
         </div>
 
