@@ -61,10 +61,10 @@ export default function HomePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         const { data: profile } = await supabase.from('profiles').select('id, language').eq('id', session.user.id).single();
-        if (profile?.language) {
-          setSelectedLang(profile.language);
-          localStorage.setItem('cp_language', profile.language);
-        }
+       await supabase.from('profiles').update({ language: selectedLang }).eq('id', session.user.id)
+setSelectedLang(selectedLang)
+localStorage.setItem('cp_language', selectedLang)
+document.documentElement.dir = translations[selectedLang]?.dir || 'ltr'
         router.push(profile ? '/dashboard' : '/onboarding');
       }
     };
