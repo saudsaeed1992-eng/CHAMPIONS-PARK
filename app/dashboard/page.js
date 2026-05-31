@@ -353,11 +353,14 @@ export default function DashboardPage() {
                 <h2 style={{ fontFamily: 'Georgia, serif', fontSize: '20px', color: '#1B3A2A' }}>🗓 {t('yourWorkoutPlan')}</h2>
                 <p style={{ fontSize: '13px', color: '#5A7A5A', fontStyle: 'italic' }}>Personalized by Claude AI for your goal</p>
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                {[1, 2].map(w => (
-                  <button key={w} onClick={() => { setWeekTab(w); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>{t('week')} {w}</button>
-                ))}
-              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+  {Array.from(
+    { length: plan?.workout_plan?.weeks?.length || 2 },
+    (_, i) => i + 1
+  ).map(w => (
+    <button key={w} onClick={() => { setWeekTab(w); setSelectedDay(0); }} style={{ padding: '7px 16px', borderRadius: '8px', border: 'none', background: weekTab === w ? '#2D5A2D' : 'rgba(134,168,134,0.25)', color: weekTab === w ? '#FDFCFA' : '#1B3A2A', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>{t('week')} {w}</button>
+  ))}
+</div>
             </div>
 
             {workoutDays.length === 0 ? (
