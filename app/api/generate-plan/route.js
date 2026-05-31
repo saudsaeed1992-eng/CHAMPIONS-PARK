@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import anthropic from '@/lib/anthropic';
+import getClient from '@/lib/anthropic';
 import supabaseServer from '@/lib/supabaseServer';
 
 export async function POST(request) {
@@ -69,7 +69,8 @@ export async function POST(request) {
         + 'Generate 4 workout days for week 1, 4 for week 2 with progressive overload, and 7 meals. Respond with ONLY the JSON.';
     }
 
-    const message = await anthropic.messages.create({
+    const anthropic = getClient();
+const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4000,
       system: systemPrompt,
