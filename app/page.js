@@ -181,7 +181,7 @@ export default function HomePage() {
             Where Champions Are Built.
           </p>
           <p style={{ fontSize: '13px', color: '#5A7A5A', lineHeight: '1.6', marginBottom: '16px' }}>
-            Free AI fitness plans for weight loss and bodybuilding — powered by Claude AI
+           Personalized fitness plans for weight loss and bodybuilding — built for champions
           </p>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -338,7 +338,7 @@ export default function HomePage() {
 
         {/* Trust badges */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '20px', flexWrap: 'wrap' }}>
-          {[{ icon: '🤖', text: 'Powered by Claude AI' }, { icon: '🔒', text: 'Secure & Private' }, { icon: '⚡', text: 'Instant Plan Generation' }].map(b => (
+          { icon: '⚡', text: 'Instant Plan Generation' }, { icon: '🔒', text: 'Secure & Private' }].map(b => (
             <div key={b.text} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#5A7A5A' }}>
               <span>{b.icon}</span><span>{b.text}</span>
             </div>
