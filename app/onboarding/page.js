@@ -217,10 +217,10 @@ export default function OnboardingPage() {
         }}>
           <div style={{ fontSize: '52px' }}>🤖</div>
           <div style={{ fontSize: '22px', fontWeight: '700', color: '#FDFCFA', fontFamily: 'Georgia, serif' }}>
-            Claude is building your plan...
+            Building your personalized plan...
           </div>
           <div style={{ fontSize: '14px', color: 'rgba(253,252,250,0.7)', textAlign: 'center', maxWidth: '300px', lineHeight: '1.6' }}>
-            Analyzing your profile, schedule and daily routine to create your perfect personalized program
+            Analyzing your profile, schedule and daily routine to create your perfect program
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
             {[0, 1, 2].map(i => (
