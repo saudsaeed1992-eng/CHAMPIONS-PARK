@@ -1,581 +1,911 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import supabase from '@/lib/supabase';
+// app/onboarding/page.js
+// Champions Park — Full Onboarding Wizard
+// 4 Steps: Profile, Equipment, Photos, Schedule
+// Fully translated in EN, AR, KU, TR with RTL support
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useLanguage } from '@/lib/LanguageContext'
+
+const EQUIPMENT_KEYS = [
+  'equipmentDumbbells',
+  'equipmentBarbell',
+  'equipmentResistanceBands',
+  'equipmentPullUpBar',
+  'equipmentKettlebell',
+  'equipmentTreadmill',
+  'equipmentCableMachine',
+  'equipmentNoEquipment',
+]
+
+const DAY_KEYS = [
+  { key: 'monday',    value: 'monday' },
+  { key: 'tuesday',   value: 'tuesday' },
+  { key: 'wednesday', value: 'wednesday' },
+  { key: 'thursday',  value: 'thursday' },
+  { key: 'friday',    value: 'friday' },
+  { key: 'saturday',  value: 'saturday' },
+  { key: 'sunday',    value: 'sunday' },
+]
+
+const DURATION_KEYS = [
+  { key: 'duration30', value: '30' },
+  { key: 'duration45', value: '45' },
+  { key: 'duration60', value: '60' },
+  { key: 'duration90', value: '90' },
+]
+
+const PLAN_DURATION_KEYS = [
+  { key: 'planDuration2',  value: '2' },
+  { key: 'planDuration4',  value: '4' },
+  { key: 'planDuration8',  value: '8' },
+  { key: 'planDuration12', value: '12' },
+]
 
 export default function OnboardingPage() {
-  const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [generating, setGenerating] = useState(false);
-  const [user, setUser] = useState(null);
+  const router = useRouter()
+  const supabase = createClientComponentClient()
+  const { t, dir, isRTL, language } = useLanguage()
 
+  const [currentStep, setCurrentStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [userId, setUserId] = useState(null)
+  const [goal, setGoal] = useState('weight_loss')
+  const [uploadingPhoto, setUploadingPhoto] = useState({})
+  const [uploadedPhotos, setUploadedPhotos] = useState({})
+
+  // Form data
   const [profile, setProfile] = useState({
-    full_name: '', age: '', gender: '',
-    starting_weight: '', target_weight: '', height_cm: '', injuries: '',
-  });
+    age: '',
+    gender: 'male',
+    height: '',
+    weight: '',
+    targetWeight: '',
+    fitnessLevel: 'beginner',
+    country: '',
+  })
 
-  const [equipment, setEquipment] = useState([]);
-  const [gymPhoto, setGymPhoto] = useState(null);
-  const [gymPhotoPreview, setGymPhotoPreview] = useState(null);
-  const [photos, setPhotos] = useState({ front: null, back: null, left: null, right: null });
-  const [photoPreviews, setPhotoPreviews] = useState({ front: null, back: null, left: null, right: null });
+  const [equipment, setEquipment] = useState({
+    gymAccess: false,
+    selectedEquipment: [],
+    injuries: '',
+    dietaryRestrictions: '',
+  })
 
   const [schedule, setSchedule] = useState({
-    workout_start: '07:00',
-    workout_end: '08:00',
-    plan_start_date: new Date().toISOString().split('T')[0],
-    plan_end_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    wake_time: '06:00',
-    sleep_time: '23:00',
-    work_start: '09:00',
-    work_end: '17:00',
-    meals_per_day: '3',
-    rest_days: [],
-    daily_routine: '',
-    notes: '',
-  });
+    workoutDays: [],
+    sessionDuration: '45',
+    planDuration: '4',
+    wakeTime: '07:00',
+    sleepTime: '23:00',
+    additionalNotes: '',
+  })
 
-  const equipmentOptions = [
-    { id: 'treadmill', label: '🏃 Treadmill' },
-    { id: 'bike', label: '🚴 Stationary Bike' },
-    { id: 'cable', label: '🔗 Cable Machine' },
-    { id: 'dumbbells', label: '🏋️ Dumbbells' },
-    { id: 'bench', label: '🪑 Bench Press' },
-    { id: 'pullup', label: '🔄 Pull-up Bar' },
-    { id: 'legpress', label: '🦵 Leg Press' },
-    { id: 'bands', label: '〰️ Resistance Bands' },
-    { id: 'elliptical', label: '🌀 Elliptical' },
-    { id: 'barbell', label: '🏋️ Barbell + Plates' },
-    { id: 'mat', label: '🧘 Yoga Mat' },
-    { id: 'kettlebell', label: '🏋️ Kettlebells' },
-    { id: 'rower', label: '🚣 Rowing Machine' },
-    { id: 'smith', label: '🏗️ Smith Machine' },
-    { id: 'none', label: '🚫 No Equipment' },
-  ];
-
-  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
+  // Get current user + goal on mount
   useEffect(() => {
     const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/'); return; }
-      setUser(session.user);
-      const meta = session.user.user_metadata;
-      if (meta?.full_name) setProfile(p => ({ ...p, full_name: meta.full_name }));
-    };
-    getUser();
-  }, [router]);
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/'); return }
+      setUserId(session.user.id)
 
-  const toggleEquipment = (id) => {
-    if (id === 'none') { setEquipment(['none']); return; }
-    setEquipment(prev => {
-      const without = prev.filter(e => e !== 'none');
-      return without.includes(id) ? without.filter(e => e !== id) : [...without, id];
-    });
-  };
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('goal, language')
+        .eq('id', session.user.id)
+        .single()
 
-  const toggleRestDay = (day) => {
-    setSchedule(prev => ({
-      ...prev,
-      rest_days: prev.rest_days.includes(day)
-        ? prev.rest_days.filter(d => d !== day)
-        : [...prev.rest_days, day],
-    }));
-  };
-
-  const handlePhotoChange = (type, file) => {
-    if (!file) return;
-    setPhotos(prev => ({ ...prev, [type]: file }));
-    const reader = new FileReader();
-    reader.onload = (e) => setPhotoPreviews(prev => ({ ...prev, [type]: e.target.result }));
-    reader.readAsDataURL(file);
-  };
-
-  const handleGymPhotoChange = (file) => {
-    if (!file) return;
-    setGymPhoto(file);
-    const reader = new FileReader();
-    reader.onload = (e) => setGymPhotoPreview(e.target.result);
-    reader.readAsDataURL(file);
-  };
-
-  const uploadPhoto = async (type, file) => {
-    const formData = new FormData();
-    formData.append('photo', file);
-    formData.append('user_id', user.id);
-    formData.append('photo_type', type);
-    formData.append('week_number', '1');
-    const res = await fetch('/api/upload-photo', { method: 'POST', body: formData });
-    const data = await res.json();
-    return data.url;
-  };
-
-  const handleGenerate = async () => {
-    if (!photos.front || !photos.back || !photos.left || !photos.right) {
-      alert('Please upload all 4 photos before continuing.');
-      return;
+      if (profileData?.goal) setGoal(profileData.goal)
     }
-    setGenerating(true);
+    getUser()
+  }, [])
+
+  const toggleEquipment = (item) => {
+    setEquipment((prev) => ({
+      ...prev,
+      selectedEquipment: prev.selectedEquipment.includes(item)
+        ? prev.selectedEquipment.filter((e) => e !== item)
+        : [...prev.selectedEquipment, item],
+    }))
+  }
+
+  const toggleDay = (day) => {
+    setSchedule((prev) => ({
+      ...prev,
+      workoutDays: prev.workoutDays.includes(day)
+        ? prev.workoutDays.filter((d) => d !== day)
+        : [...prev.workoutDays, day],
+    }))
+  }
+
+  const handlePhotoUpload = async (file, position) => {
+    if (!file || !userId) return
+    setUploadingPhoto((prev) => ({ ...prev, [position]: true }))
     try {
-      await Promise.all([
-        uploadPhoto('front', photos.front),
-        uploadPhoto('back', photos.back),
-        uploadPhoto('left', photos.left),
-        uploadPhoto('right', photos.right),
-        gymPhoto ? uploadPhoto('gym', gymPhoto) : Promise.resolve(),
-      ]);
+      const ext = file.name.split('.').pop()
+      const path = `${userId}/${position}_${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('champion-photos')
+        .upload(path, file, { upsert: true })
 
-      const { data: { session } } = await supabase.auth.getSession();
-      const goalType = session.user.user_metadata?.goal_type || 'weight_loss';
-      const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from('champion-photos')
+          .getPublicUrl(path)
 
+        await supabase.from('user_photos').upsert({
+          user_id: userId,
+          position,
+          url: urlData.publicUrl,
+          uploaded_at: new Date().toISOString(),
+        })
+        setUploadedPhotos((prev) => ({ ...prev, [position]: urlData.publicUrl }))
+      }
+    } catch (err) {
+      console.error('Photo upload error:', err)
+    } finally {
+      setUploadingPhoto((prev) => ({ ...prev, [position]: false }))
+    }
+  }
+
+  const handleFinish = async () => {
+    setLoading(true)
+    try {
+      // Save full profile
       await supabase.from('profiles').upsert({
-        id: user.id,
-        full_name: profile.full_name,
+        id: userId,
         age: parseInt(profile.age),
         gender: profile.gender,
-        goal_type: goalType,
-        starting_weight: parseFloat(profile.starting_weight),
-        target_weight: parseFloat(profile.target_weight),
-        height_cm: parseInt(profile.height_cm),
-        injuries: profile.injuries,
-        gym_equipment: equipment,
-        beta_number: (count || 0) + 1,
-      });
+        height: parseFloat(profile.height),
+        weight: parseFloat(profile.weight),
+        target_weight: parseFloat(profile.targetWeight),
+        fitness_level: profile.fitnessLevel,
+        country: profile.country,
+        gym_access: equipment.gymAccess,
+        equipment: equipment.selectedEquipment,
+        injuries: equipment.injuries,
+        dietary_restrictions: equipment.dietaryRestrictions,
+        workout_days: schedule.workoutDays,
+        session_duration: parseInt(schedule.sessionDuration),
+        plan_duration: parseInt(schedule.planDuration),
+        wake_time: schedule.wakeTime,
+        sleep_time: schedule.sleepTime,
+        additional_notes: schedule.additionalNotes,
+        language: language,
+        onboarding_complete: true,
+        updated_at: new Date().toISOString(),
+      })
 
-      const res = await fetch('/api/generate-plan', {
+      // Generate AI plan
+      const response = await fetch('/api/generate-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profile: {
-            ...profile,
-            user_id: user.id,
-            gym_equipment: equipment,
-            schedule: schedule,
-          },
-          goal_type: goalType,
+          userId,
+          goal,
+          profile,
+          equipment,
+          schedule,
+          language,
         }),
-      });
+      })
 
-      const data = await res.json();
-      if (data.success) { router.push('/dashboard'); }
-      else { alert('Error: ' + JSON.stringify(data)); }
+      if (response.ok) {
+        router.push('/dashboard')
+      } else {
+        router.push('/dashboard')
+      }
     } catch (err) {
-      alert('Something went wrong: ' + err.message);
+      console.error('Onboarding finish error:', err)
+      router.push('/dashboard')
     } finally {
-      setGenerating(false);
+      setLoading(false)
     }
-  };
+  }
+
+  // ── STYLES ──
+  const cardStyle = {
+    background: '#FDFCFA',
+    borderRadius: '20px',
+    padding: '32px',
+    width: '100%',
+    maxWidth: '560px',
+    boxShadow: '0 8px 40px rgba(0,0,0,0.10)',
+    border: '1px solid rgba(45,90,45,0.1)',
+  }
 
   const inputStyle = {
-    width: '100%', padding: '11px 14px',
-    background: '#FDFCFA',
-    border: '1.5px solid rgba(134,168,134,0.35)',
-    borderRadius: '10px', color: '#1B3A2A',
-    fontSize: '14px', fontFamily: 'inherit',
-    boxSizing: 'border-box',
-  };
+    width: '100%',
+    padding: '12px 14px',
+    border: '1.5px solid rgba(0,0,0,0.12)',
+    borderRadius: '10px',
+    fontSize: '15px',
+    background: '#fafafa',
+    color: '#1a1a1a',
+    outline: 'none',
+    fontFamily: 'inherit',
+    direction: dir,
+  }
 
   const labelStyle = {
-    display: 'block', fontSize: '11px',
-    fontWeight: '600', letterSpacing: '1px',
-    textTransform: 'uppercase', color: '#5A7A5A',
-    marginBottom: '5px',
-  };
+    display: 'block',
+    fontSize: '11px',
+    fontWeight: '700',
+    letterSpacing: '0.8px',
+    color: '#555',
+    marginBottom: '6px',
+    textTransform: 'uppercase',
+  }
 
-  const sectionStyle = {
-    background: 'rgba(232,245,233,0.5)',
-    border: '1px solid rgba(134,168,134,0.25)',
-    borderRadius: '12px', padding: '16px',
-    marginBottom: '16px',
-  };
+  const selectStyle = {
+    ...inputStyle,
+    cursor: 'pointer',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+  }
 
-  const photoTypes = [
-    { key: 'front', label: '📸 Front View' },
-    { key: 'back', label: '📸 Back View' },
-    { key: 'left', label: '📸 Left Side' },
-    { key: 'right', label: '📸 Right Side' },
-  ];
+  const accentColor = goal === 'bodybuilding' ? '#8b5cf6' : '#2D5A2D'
 
-  const totalPhotos = Object.values(photos).filter(Boolean).length;
+  // Progress bar
+  const totalSteps = 4
+  const progress = (currentStep / totalSteps) * 100
 
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #E8F5E9 0%, #F1F8E9 50%, #E8F5E9 100%)',
-      fontFamily: 'Georgia, system-ui, sans-serif',
-      padding: '24px 16px',
+      background: 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 50%, #E8F5E9 100%)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      padding: '24px',
+      paddingTop: '40px',
+      fontFamily: "'Inter', system-ui, sans-serif",
+      direction: dir,
     }}>
-      {generating && (
+
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: '28px', width: '100%', maxWidth: '560px' }}>
         <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(27,58,42,0.9)',
-          zIndex: 1000, display: 'flex',
-          flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', gap: '16px',
+          width: '52px', height: '52px',
+          background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+          borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 12px',
         }}>
-          <div style={{ fontSize: '52px' }}>🤖</div>
-          <div style={{ fontSize: '22px', fontWeight: '700', color: '#FDFCFA', fontFamily: 'Georgia, serif' }}>
-            Building your personalized plan...
+          <span style={{ fontSize: '24px' }}>🏆</span>
+        </div>
+        <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#2D5A2D' }}>
+          {t('onboardingTitle')}
+        </h1>
+        <p style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>
+          {t('onboardingSubtitle')}
+        </p>
+
+        {/* Step indicator */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          marginTop: '16px',
+          fontSize: '13px',
+          color: '#888',
+        }}>
+          <span style={{ fontWeight: '600', color: accentColor }}>
+            {t('step')} {currentStep}
+          </span>
+          <span>{t('of')} {totalSteps}</span>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{
+          width: '100%',
+          height: '6px',
+          background: 'rgba(0,0,0,0.08)',
+          borderRadius: '3px',
+          marginTop: '10px',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${progress}%`,
+            height: '100%',
+            background: `linear-gradient(90deg, ${accentColor}, ${accentColor}cc)`,
+            borderRadius: '3px',
+            transition: 'width 0.4s ease',
+          }}></div>
+        </div>
+      </div>
+
+      {/* ── STEP 1: PROFILE ── */}
+      {currentStep === 1 && (
+        <div style={cardStyle}>
+          <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' }}>
+            {t('stepProfileTitle')}
+          </h2>
+          <p style={{ fontSize: '13px', color: '#888', marginBottom: '24px' }}>
+            {t('stepProfileSubtitle')}
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Age */}
+            <div>
+              <label style={labelStyle}>{t('age')}</label>
+              <input
+                type="number"
+                placeholder={t('agePlaceholder')}
+                value={profile.age}
+                onChange={(e) => setProfile({ ...profile, age: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Gender */}
+            <div>
+              <label style={labelStyle}>{t('gender')}</label>
+              <select
+                value={profile.gender}
+                onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
+                style={selectStyle}
+              >
+                <option value="male">{t('genderMale')}</option>
+                <option value="female">{t('genderFemale')}</option>
+              </select>
+            </div>
+
+            {/* Height */}
+            <div>
+              <label style={labelStyle}>{t('height')}</label>
+              <input
+                type="number"
+                placeholder={t('heightPlaceholder')}
+                value={profile.height}
+                onChange={(e) => setProfile({ ...profile, height: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Weight */}
+            <div>
+              <label style={labelStyle}>{t('weight')}</label>
+              <input
+                type="number"
+                placeholder={t('weightPlaceholder')}
+                value={profile.weight}
+                onChange={(e) => setProfile({ ...profile, weight: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Target weight */}
+            <div>
+              <label style={labelStyle}>{t('targetWeight')}</label>
+              <input
+                type="number"
+                placeholder={t('targetWeightPlaceholder')}
+                value={profile.targetWeight}
+                onChange={(e) => setProfile({ ...profile, targetWeight: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Fitness level */}
+            <div>
+              <label style={labelStyle}>{t('fitnessLevel')}</label>
+              <select
+                value={profile.fitnessLevel}
+                onChange={(e) => setProfile({ ...profile, fitnessLevel: e.target.value })}
+                style={selectStyle}
+              >
+                <option value="beginner">{t('fitnessLevelBeginner')}</option>
+                <option value="intermediate">{t('fitnessLevelIntermediate')}</option>
+                <option value="advanced">{t('fitnessLevelAdvanced')}</option>
+              </select>
+            </div>
           </div>
-          <div style={{ fontSize: '14px', color: 'rgba(253,252,250,0.7)', textAlign: 'center', maxWidth: '300px', lineHeight: '1.6' }}>
-            Analyzing your profile, schedule and daily routine to create your perfect program
-          </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            {[0, 1, 2].map(i => (
-              <div key={i} style={{
-                width: '10px', height: '10px', borderRadius: '50%',
-                background: '#86A886',
-                animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
-              }} />
-            ))}
+
+          {/* Country */}
+          <div style={{ marginTop: '16px' }}>
+            <label style={labelStyle}>{t('country')}</label>
+            <input
+              type="text"
+              placeholder={t('countryPlaceholder')}
+              value={profile.country}
+              onChange={(e) => setProfile({ ...profile, country: e.target.value })}
+              style={inputStyle}
+            />
           </div>
         </div>
       )}
 
-      <div style={{ maxWidth: '580px', margin: '0 auto' }}>
+      {/* ── STEP 2: EQUIPMENT ── */}
+      {currentStep === 2 && (
+        <div style={cardStyle}>
+          <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' }}>
+            {t('stepEquipmentTitle')}
+          </h2>
+          <p style={{ fontSize: '13px', color: '#888', marginBottom: '24px' }}>
+            {t('stepEquipmentSubtitle')}
+          </p>
 
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <img src="/logo.svg" alt="Champions Park" style={{ width: '50px', height: '50px', marginBottom: '4px' }} />
-          <h1 style={{ fontFamily: 'Georgia, serif', fontSize: '24px', color: '#1B3A2A', margin: 0 }}>Champions Park</h1>
-        </div>
-
-        {/* Progress */}
-        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
-          <div style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px', fontWeight: '500' }}>
-            Step {step} of 4
-          </div>
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            {[1, 2, 3, 4].map(s => (
-              <div key={s} style={{
-                height: '5px', width: '70px', borderRadius: '3px',
-                background: s <= step ? '#2D5A2D' : 'rgba(134,168,134,0.3)',
-                transition: 'background 0.3s',
-              }} />
-            ))}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '8px' }}>
-            {[
-              { n: 1, label: 'Profile' },
-              { n: 2, label: 'Equipment' },
-              { n: 3, label: 'Photos' },
-              { n: 4, label: 'Schedule' },
-            ].map(({ n, label }) => (
-              <div key={n} style={{
-                fontSize: '10px', fontWeight: '600',
-                color: step === n ? '#2D5A2D' : '#86A886',
-                width: '70px', textAlign: 'center',
-                textTransform: 'uppercase', letterSpacing: '0.5px',
-              }}>{label}</div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{
-          background: '#FDFCFA',
-          border: '1px solid rgba(134,168,134,0.3)',
-          borderRadius: '18px',
-          boxShadow: '0 8px 32px rgba(27,58,42,0.1)',
-          padding: '28px',
-        }}>
-
-          {/* ── STEP 1: BODY PROFILE ── */}
-          {step === 1 && (
-            <div>
-              <h2 style={{ fontSize: '20px', color: '#1B3A2A', marginBottom: '4px' }}>Your Body Profile</h2>
-              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '20px', fontStyle: 'italic' }}>
-                Tell us about yourself so Claude can personalize your plan
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Full Name</label>
-                  <input style={inputStyle} value={profile.full_name} onChange={e => setProfile({ ...profile, full_name: e.target.value })} placeholder="John Champion" />
+          {/* Gym access */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>{t('gymAccess')}</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { value: true,  label: t('gymAccessYes') },
+                { value: false, label: t('gymAccessNo') },
+              ].map((opt) => (
+                <div
+                  key={String(opt.value)}
+                  onClick={() => setEquipment({ ...equipment, gymAccess: opt.value })}
+                  style={{
+                    padding: '12px 16px',
+                    border: equipment.gymAccess === opt.value
+                      ? `2px solid ${accentColor}`
+                      : '2px solid rgba(0,0,0,0.08)',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    background: equipment.gymAccess === opt.value
+                      ? `${accentColor}0d`
+                      : 'transparent',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#1a1a1a',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  <div style={{
+                    width: '16px', height: '16px',
+                    borderRadius: '50%',
+                    border: equipment.gymAccess === opt.value
+                      ? `5px solid ${accentColor}`
+                      : '2px solid #ccc',
+                    flexShrink: 0,
+                  }}></div>
+                  {opt.label}
                 </div>
-                <div>
-                  <label style={labelStyle}>Age</label>
-                  <input style={inputStyle} type="number" min="16" max="70" value={profile.age} onChange={e => setProfile({ ...profile, age: e.target.value })} placeholder="25" />
-                </div>
-                <div>
-                  <label style={labelStyle}>Gender</label>
-                  <select style={inputStyle} value={profile.gender} onChange={e => setProfile({ ...profile, gender: e.target.value })}>
-                    <option value="">Select...</option>
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Current Weight (kg)</label>
-                  <input style={inputStyle} type="number" value={profile.starting_weight} onChange={e => setProfile({ ...profile, starting_weight: e.target.value })} placeholder="80" />
-                </div>
-                <div>
-                  <label style={labelStyle}>Target Weight (kg)</label>
-                  <input style={inputStyle} type="number" value={profile.target_weight} onChange={e => setProfile({ ...profile, target_weight: e.target.value })} placeholder="70" />
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Height (cm)</label>
-                  <input style={inputStyle} type="number" value={profile.height_cm} onChange={e => setProfile({ ...profile, height_cm: e.target.value })} placeholder="175" />
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Injuries or Limitations</label>
-                  <textarea style={{ ...inputStyle, height: '70px', resize: 'vertical' }} value={profile.injuries} onChange={e => setProfile({ ...profile, injuries: e.target.value })} placeholder="e.g. bad knees, lower back pain — or leave blank" />
-                </div>
-              </div>
-              <button onClick={() => setStep(2)} style={{ width: '100%', marginTop: '20px', padding: '13px', background: '#2D5A2D', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '15px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
-                Continue → Equipment 💪
-              </button>
+              ))}
             </div>
-          )}
+          </div>
 
-          {/* ── STEP 2: EQUIPMENT ── */}
-          {step === 2 && (
-            <div>
-              <h2 style={{ fontSize: '20px', color: '#1B3A2A', marginBottom: '4px' }}>Your Equipment</h2>
-              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '16px', fontStyle: 'italic' }}>Select your equipment OR upload a gym photo</p>
-
-              <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', textTransform: 'uppercase', color: '#5A7A5A', marginBottom: '8px' }}>Option A — Select Equipment</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', marginBottom: '16px' }}>
-                {equipmentOptions.map(opt => (
-                  <label key={opt.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '10px 12px',
-                    background: equipment.includes(opt.id) ? 'rgba(45,90,45,0.08)' : '#FDFCFA',
-                    border: `1.5px solid ${equipment.includes(opt.id) ? '#2D5A2D' : 'rgba(134,168,134,0.35)'}`,
-                    borderRadius: '10px', cursor: 'pointer',
-                    fontSize: '13px', fontWeight: '500', color: '#1B3A2A',
-                    transition: 'all 0.2s',
-                  }}>
-                    <input type="checkbox" checked={equipment.includes(opt.id)} onChange={() => toggleEquipment(opt.id)} style={{ accentColor: '#2D5A2D', width: '15px', height: '15px' }} />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-
-              <div style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', textTransform: 'uppercase', color: '#5A7A5A', marginBottom: '8px' }}>Option B — Upload Gym Photo</div>
-              <label style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: '8px', padding: '18px',
-                background: gymPhotoPreview ? 'transparent' : 'rgba(134,168,134,0.06)',
-                border: `2px dashed ${gymPhoto ? '#2D5A2D' : 'rgba(134,168,134,0.4)'}`,
-                borderRadius: '12px', cursor: 'pointer', minHeight: '100px', overflow: 'hidden',
-                marginBottom: '20px',
-              }}>
-                <input type="file" accept="image/*" onChange={e => handleGymPhotoChange(e.target.files[0])} style={{ display: 'none' }} />
-                {gymPhotoPreview ? (
-                  <img src={gymPhotoPreview} alt="gym" style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '8px' }} />
-                ) : (
-                  <>
-                    <span style={{ fontSize: '28px' }}>📷</span>
-                    <span style={{ fontSize: '13px', color: '#5A7A5A', textAlign: 'center' }}>Click to upload gym or equipment photo</span>
-                  </>
-                )}
-              </label>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setStep(1)} style={{ flex: 1, padding: '13px', background: 'transparent', border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '12px', color: '#1B3A2A', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>← Back</button>
-                <button onClick={() => setStep(3)} style={{ flex: 2, padding: '13px', background: '#2D5A2D', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '14px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>Continue → Photos 📸</button>
-              </div>
-            </div>
-          )}
-
-          {/* ── STEP 3: 4 BODY PHOTOS ── */}
-          {step === 3 && (
-            <div>
-              <h2 style={{ fontSize: '20px', color: '#1B3A2A', marginBottom: '4px' }}>Starting Photos</h2>
-              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '8px', fontStyle: 'italic' }}>Upload all 4 angles for a better plan</p>
-              <div style={{ background: 'rgba(45,90,45,0.06)', border: '1px solid rgba(45,90,45,0.15)', borderRadius: '10px', padding: '10px 14px', marginBottom: '16px', fontSize: '12px', color: '#2D5A2D' }}>
-                💡 4 angles help Claude design a more accurate and balanced workout plan
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
-                {photoTypes.map(({ key, label }) => (
-                  <label key={key} style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: '6px', padding: '14px 8px',
-                    background: photoPreviews[key] ? 'transparent' : 'rgba(134,168,134,0.06)',
-                    border: `2px dashed ${photos[key] ? '#2D5A2D' : 'rgba(134,168,134,0.4)'}`,
-                    borderRadius: '12px', cursor: 'pointer', minHeight: '120px', overflow: 'hidden',
-                    transition: 'all 0.2s',
-                  }}>
-                    <input type="file" accept="image/*" onChange={e => handlePhotoChange(key, e.target.files[0])} style={{ display: 'none' }} />
-                    {photoPreviews[key] ? (
-                      <>
-                        <img src={photoPreviews[key]} alt={key} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px' }} />
-                        <span style={{ fontSize: '11px', color: '#2D5A2D', fontWeight: '600' }}>✓ {label}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span style={{ fontSize: '26px' }}>📷</span>
-                        <span style={{ fontSize: '12px', color: '#5A7A5A', fontWeight: '600', textAlign: 'center' }}>{label}</span>
-                        <span style={{ fontSize: '10px', color: '#86A886' }}>Tap to upload</span>
-                      </>
-                    )}
-                  </label>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
-                {photoTypes.map(({ key }) => (
-                  <div key={key} style={{ fontSize: '11px', color: photos[key] ? '#2D5A2D' : '#86A886', fontWeight: photos[key] ? '600' : '400' }}>
-                    {photos[key] ? '✅' : '⬜'} {key}
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setStep(2)} style={{ flex: 1, padding: '13px', background: 'transparent', border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '12px', color: '#1B3A2A', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>← Back</button>
-                <button onClick={() => setStep(4)} disabled={totalPhotos < 4} style={{ flex: 2, padding: '13px', background: totalPhotos === 4 ? '#2D5A2D' : 'rgba(134,168,134,0.3)', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '14px', fontWeight: '700', cursor: totalPhotos === 4 ? 'pointer' : 'not-allowed', fontFamily: 'inherit', transition: 'all 0.3s' }}>
-                  {totalPhotos === 4 ? 'Continue → Schedule ⏰' : `Upload ${4 - totalPhotos} more photo(s)`}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── STEP 4: SCHEDULE & ROUTINE ── */}
-          {step === 4 && (
-            <div>
-              <h2 style={{ fontSize: '20px', color: '#1B3A2A', marginBottom: '4px' }}>Your Schedule & Routine</h2>
-              <p style={{ fontSize: '13px', color: '#5A7A5A', marginBottom: '20px', fontStyle: 'italic' }}>
-                Help Claude build a plan that fits your real life
-              </p>
-
-              {/* Workout Hours */}
-              <div style={sectionStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>⏰</span>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>Daily Workout Window</div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={labelStyle}>Workout Start Time</label>
-                    <input type="time" style={inputStyle} value={schedule.workout_start} onChange={e => setSchedule({ ...schedule, workout_start: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Workout End Time</label>
-                    <input type="time" style={inputStyle} value={schedule.workout_end} onChange={e => setSchedule({ ...schedule, workout_end: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Plan Duration */}
-              <div style={sectionStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>📅</span>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>Plan Duration</div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={labelStyle}>Start Date</label>
-                    <input type="date" style={inputStyle} value={schedule.plan_start_date} onChange={e => setSchedule({ ...schedule, plan_start_date: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>End Date</label>
-                    <input type="date" style={inputStyle} value={schedule.plan_end_date} onChange={e => setSchedule({ ...schedule, plan_end_date: e.target.value })} />
-                  </div>
-                </div>
-                <div style={{ marginTop: '8px', fontSize: '12px', color: '#5A7A5A', fontStyle: 'italic' }}>
-                  {schedule.plan_start_date && schedule.plan_end_date
-                    ? `📆 ${Math.ceil((new Date(schedule.plan_end_date) - new Date(schedule.plan_start_date)) / (1000 * 60 * 60 * 24))} days total`
-                    : 'Select start and end dates'}
-                </div>
-              </div>
-
-              {/* Daily Routine */}
-              <div style={sectionStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>🌅</span>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>Daily Routine</div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                  <div>
-                    <label style={labelStyle}>Wake Up Time</label>
-                    <input type="time" style={inputStyle} value={schedule.wake_time} onChange={e => setSchedule({ ...schedule, wake_time: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Sleep Time</label>
-                    <input type="time" style={inputStyle} value={schedule.sleep_time} onChange={e => setSchedule({ ...schedule, sleep_time: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Work / School Start</label>
-                    <input type="time" style={inputStyle} value={schedule.work_start} onChange={e => setSchedule({ ...schedule, work_start: e.target.value })} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Work / School End</label>
-                    <input type="time" style={inputStyle} value={schedule.work_end} onChange={e => setSchedule({ ...schedule, work_end: e.target.value })} />
-                  </div>
-                </div>
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={labelStyle}>Meals Per Day</label>
-                  <select style={inputStyle} value={schedule.meals_per_day} onChange={e => setSchedule({ ...schedule, meals_per_day: e.target.value })}>
-                    <option value="2">2 meals</option>
-                    <option value="3">3 meals</option>
-                    <option value="4">4 meals</option>
-                    <option value="5">5 meals</option>
-                    <option value="6">6 meals (bodybuilder)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Rest Days */}
-              <div style={sectionStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>😴</span>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>Preferred Rest Days</div>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {daysOfWeek.map(day => (
-                    <button key={day} type="button" onClick={() => toggleRestDay(day)} style={{
-                      padding: '6px 14px', borderRadius: '20px', border: 'none',
-                      background: schedule.rest_days.includes(day) ? '#2D5A2D' : 'rgba(134,168,134,0.2)',
-                      color: schedule.rest_days.includes(day) ? '#FDFCFA' : '#2D5A2D',
-                      fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                      fontFamily: 'inherit', transition: 'all 0.2s',
+          {/* Equipment checkboxes */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>{t('availableEquipment')}</label>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '8px',
+            }}>
+              {EQUIPMENT_KEYS.map((key) => {
+                const val = key.replace('equipment', '').toLowerCase()
+                const selected = equipment.selectedEquipment.includes(val)
+                return (
+                  <div
+                    key={key}
+                    onClick={() => toggleEquipment(val)}
+                    style={{
+                      padding: '10px 12px',
+                      border: selected
+                        ? `2px solid ${accentColor}`
+                        : '2px solid rgba(0,0,0,0.08)',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      background: selected ? `${accentColor}0d` : 'transparent',
+                      fontSize: '13px',
+                      fontWeight: selected ? '600' : '400',
+                      color: selected ? accentColor : '#555',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <span style={{
+                      width: '16px', height: '16px',
+                      borderRadius: '4px',
+                      border: selected ? `2px solid ${accentColor}` : '2px solid #ccc',
+                      background: selected ? accentColor : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                      fontSize: '10px',
+                      color: 'white',
                     }}>
-                      {day.substring(0, 3)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Additional Notes */}
-              <div style={sectionStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>📝</span>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A2A' }}>General Daily Routine & Notes</div>
-                </div>
-                <div style={{ marginBottom: '10px' }}>
-                  <label style={labelStyle}>Describe Your Daily Routine</label>
-                  <textarea
-                    style={{ ...inputStyle, height: '90px', resize: 'vertical' }}
-                    value={schedule.daily_routine}
-                    onChange={e => setSchedule({ ...schedule, daily_routine: e.target.value })}
-                    placeholder="e.g. I wake at 6am, drop kids at school at 8am, work 9-5, usually tired by 8pm. I prefer morning workouts before work. I cook at home most days but eat out on weekends..."
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Any Other Notes for Claude</label>
-                  <textarea
-                    style={{ ...inputStyle, height: '70px', resize: 'vertical' }}
-                    value={schedule.notes}
-                    onChange={e => setSchedule({ ...schedule, notes: e.target.value })}
-                    placeholder="e.g. I travel for work on Tuesdays, I fast until noon, I have a gym partner on Fridays only..."
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setStep(3)} style={{ flex: 1, padding: '13px', background: 'transparent', border: '1.5px solid rgba(134,168,134,0.4)', borderRadius: '12px', color: '#1B3A2A', fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>← Back</button>
-                <button onClick={handleGenerate} style={{ flex: 2, padding: '13px', background: '#C9922A', border: 'none', borderRadius: '12px', color: '#FDFCFA', fontSize: '15px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 16px rgba(201,146,42,0.3)' }}>
-                  ✨ Generate My Free Plan
-                </button>
-              </div>
+                      {selected ? '✓' : ''}
+                    </span>
+                    {t(key)}
+                  </div>
+                )
+              })}
             </div>
-          )}
+          </div>
 
+          {/* Injuries */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={labelStyle}>{t('injuries')}</label>
+            <textarea
+              placeholder={t('injuriesPlaceholder')}
+              value={equipment.injuries}
+              onChange={(e) => setEquipment({ ...equipment, injuries: e.target.value })}
+              rows={3}
+              style={{
+                ...inputStyle,
+                resize: 'vertical',
+                lineHeight: '1.5',
+              }}
+            />
+          </div>
+
+          {/* Dietary */}
+          <div>
+            <label style={labelStyle}>{t('dietaryRestrictions')}</label>
+            <textarea
+              placeholder={t('dietaryPlaceholder')}
+              value={equipment.dietaryRestrictions}
+              onChange={(e) => setEquipment({ ...equipment, dietaryRestrictions: e.target.value })}
+              rows={3}
+              style={{
+                ...inputStyle,
+                resize: 'vertical',
+                lineHeight: '1.5',
+              }}
+            />
+          </div>
         </div>
+      )}
+
+      {/* ── STEP 3: PHOTOS ── */}
+      {currentStep === 3 && (
+        <div style={cardStyle}>
+          <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' }}>
+            {t('stepPhotosTitle')}
+          </h2>
+          <p style={{ fontSize: '13px', color: '#888', marginBottom: '8px' }}>
+            {t('stepPhotosSubtitle')}
+          </p>
+
+          {/* Privacy note */}
+          <div style={{
+            background: 'rgba(45,90,45,0.06)',
+            border: '1px solid rgba(45,90,45,0.15)',
+            borderRadius: '8px',
+            padding: '10px 14px',
+            fontSize: '12px',
+            color: '#2D5A2D',
+            marginBottom: '20px',
+          }}>
+            {t('photoPrivacy')}
+          </div>
+
+          {/* Photo uploads */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {[
+              { position: 'front', label: t('photoFront'), emoji: '👤' },
+              { position: 'back',  label: t('photoBack'),  emoji: '🔄' },
+              { position: 'side',  label: t('photoSide'),  emoji: '↔️' },
+            ].map(({ position, label, emoji }) => (
+              <div key={position}>
+                <label style={labelStyle}>{label}</label>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  padding: '24px',
+                  border: uploadedPhotos[position]
+                    ? `2px solid ${accentColor}`
+                    : '2px dashed rgba(0,0,0,0.15)',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  background: uploadedPhotos[position]
+                    ? `${accentColor}08`
+                    : '#fafafa',
+                  transition: 'all 0.2s ease',
+                }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      if (e.target.files[0]) handlePhotoUpload(e.target.files[0], position)
+                    }}
+                  />
+                  {uploadingPhoto[position] ? (
+                    <span style={{ fontSize: '13px', color: '#888' }}>{t('uploading')}</span>
+                  ) : uploadedPhotos[position] ? (
+                    <>
+                      <img
+                        src={uploadedPhotos[position]}
+                        alt={label}
+                        style={{
+                          width: '80px', height: '80px',
+                          objectFit: 'cover', borderRadius: '8px',
+                        }}
+                      />
+                      <span style={{ fontSize: '13px', color: accentColor, fontWeight: '600' }}>
+                        {t('uploaded')}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: '28px' }}>{emoji}</span>
+                      <span style={{ fontSize: '13px', color: '#888' }}>{t('photoUploadPrompt')}</span>
+                    </>
+                  )}
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <p style={{
+            fontSize: '12px', color: '#aaa',
+            textAlign: 'center', marginTop: '16px',
+          }}>
+            {t('photoOptional')}
+          </p>
+
+          {/* Beta note */}
+          <div style={{
+            background: 'rgba(201,146,42,0.08)',
+            border: '1px solid rgba(201,146,42,0.2)',
+            borderRadius: '8px',
+            padding: '10px 14px',
+            fontSize: '12px',
+            color: '#C9922A',
+            marginTop: '12px',
+          }}>
+            {t('photoBetaNote')}
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 4: SCHEDULE ── */}
+      {currentStep === 4 && (
+        <div style={cardStyle}>
+          <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1a1a1a', marginBottom: '4px' }}>
+            {t('stepScheduleTitle')}
+          </h2>
+          <p style={{ fontSize: '13px', color: '#888', marginBottom: '24px' }}>
+            {t('stepScheduleSubtitle')}
+          </p>
+
+          {/* Workout days */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>{t('workoutDays')}</label>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: '6px',
+            }}>
+              {DAY_KEYS.map(({ key, value }) => {
+                const selected = schedule.workoutDays.includes(value)
+                return (
+                  <button
+                    key={value}
+                    onClick={() => toggleDay(value)}
+                    style={{
+                      padding: '10px 4px',
+                      border: selected
+                        ? `2px solid ${accentColor}`
+                        : '2px solid rgba(0,0,0,0.08)',
+                      borderRadius: '10px',
+                      background: selected ? accentColor : 'transparent',
+                      color: selected ? 'white' : '#555',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {t(key)}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Session duration */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>{t('sessionDuration')}</label>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '8px',
+            }}>
+              {DURATION_KEYS.map(({ key, value }) => {
+                const selected = schedule.sessionDuration === value
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setSchedule({ ...schedule, sessionDuration: value })}
+                    style={{
+                      padding: '10px 6px',
+                      border: selected
+                        ? `2px solid ${accentColor}`
+                        : '2px solid rgba(0,0,0,0.08)',
+                      borderRadius: '10px',
+                      background: selected ? accentColor : 'transparent',
+                      color: selected ? 'white' : '#555',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {t(key)}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Plan duration */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>{t('planDuration')}</label>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '8px',
+            }}>
+              {PLAN_DURATION_KEYS.map(({ key, value }) => {
+                const selected = schedule.planDuration === value
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setSchedule({ ...schedule, planDuration: value })}
+                    style={{
+                      padding: '12px 8px',
+                      border: selected
+                        ? `2px solid ${accentColor}`
+                        : '2px solid rgba(0,0,0,0.08)',
+                      borderRadius: '10px',
+                      background: selected ? accentColor : 'transparent',
+                      color: selected ? 'white' : '#555',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {t(key)}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Wake + sleep time */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={labelStyle}>{t('wakeTime')}</label>
+              <input
+                type="time"
+                value={schedule.wakeTime}
+                onChange={(e) => setSchedule({ ...schedule, wakeTime: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>{t('sleepTime')}</label>
+              <input
+                type="time"
+                value={schedule.sleepTime}
+                onChange={(e) => setSchedule({ ...schedule, sleepTime: e.target.value })}
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Additional notes */}
+          <div>
+            <label style={labelStyle}>{t('additionalNotes')}</label>
+            <textarea
+              placeholder={t('additionalNotesPlaceholder')}
+              value={schedule.additionalNotes}
+              onChange={(e) => setSchedule({ ...schedule, additionalNotes: e.target.value })}
+              rows={4}
+              style={{
+                ...inputStyle,
+                resize: 'vertical',
+                lineHeight: '1.5',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── NAVIGATION BUTTONS ── */}
+      <div style={{
+        display: 'flex',
+        gap: '12px',
+        marginTop: '24px',
+        width: '100%',
+        maxWidth: '560px',
+        flexDirection: isRTL ? 'row-reverse' : 'row',
+      }}>
+        {currentStep > 1 && (
+          <button
+            onClick={() => setCurrentStep((s) => s - 1)}
+            style={{
+              flex: 1,
+              padding: '14px',
+              border: '2px solid rgba(0,0,0,0.12)',
+              borderRadius: '12px',
+              background: 'transparent',
+              color: '#555',
+              fontSize: '15px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            {t('back')}
+          </button>
+        )}
+
+        {currentStep < totalSteps ? (
+          <button
+            onClick={() => setCurrentStep((s) => s + 1)}
+            style={{
+              flex: 2,
+              padding: '14px',
+              border: 'none',
+              borderRadius: '12px',
+              background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+              color: 'white',
+              fontSize: '15px',
+              fontWeight: '700',
+              cursor: 'pointer',
+            }}
+          >
+            {t('next')}
+          </button>
+        ) : (
+          <button
+            onClick={handleFinish}
+            disabled={loading}
+            style={{
+              flex: 2,
+              padding: '14px',
+              border: 'none',
+              borderRadius: '12px',
+              background: loading ? '#ccc' : `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`,
+              color: 'white',
+              fontSize: '15px',
+              fontWeight: '700',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {loading ? t('finishing') : t('finishSetup')}
+          </button>
+        )}
+      </div>
+
+      {/* Step dots */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        marginTop: '20px',
+        justifyContent: 'center',
+      }}>
+        {[1, 2, 3, 4].map((s) => (
+          <div
+            key={s}
+            style={{
+              width: s === currentStep ? '24px' : '8px',
+              height: '8px',
+              borderRadius: '4px',
+              background: s === currentStep ? accentColor : 'rgba(0,0,0,0.15)',
+              transition: 'all 0.3s ease',
+            }}
+          />
+        ))}
       </div>
     </div>
-  );
+  )
 }
