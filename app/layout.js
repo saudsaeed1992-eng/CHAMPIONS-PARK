@@ -11,6 +11,18 @@ export const metadata = {
   title: 'Champions Park — AI Fitness Coach',
   description: 'Your AI-powered fitness coach. Built for real results. Free beta — 300 spots only.',
   keywords: 'fitness, workout, weight loss, bodybuilding, AI coach, champions park',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Champions Park',
+  },
+  icons: {
+    apple: '/logo.svg',
+  },
+}
+  description: 'Your AI-powered fitness coach. Built for real results. Free beta — 300 spots only.',
+  keywords: 'fitness, workout, weight loss, bodybuilding, AI coach, champions park',
   openGraph: {
     title: 'Champions Park — AI Fitness Coach',
     description: 'Your AI-powered fitness coach. Built for real results.',
