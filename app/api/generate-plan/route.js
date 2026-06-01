@@ -151,27 +151,34 @@ export async function POST(request) {
 
     const rawText = message.content[0].text.trim();
 
-    let planData;
-    try {
-      const jsonStart = rawText.indexOf('{');
-      const jsonEnd = rawText.lastIndexOf('}');
-      if (jsonStart === -1 || jsonEnd === -1) {
-        throw new Error('No JSON found in response');
-      }
-      const cleaned = rawText.substring(jsonStart, jsonEnd + 1);
-      planData = JSON.parse(cleaned);
-    } catch (e) {
-      try {
-        const lines = rawText.split('\n');
-        const jsonLines = lines.filter(l => !l.startsWith('```'));
-        const joined = jsonLines.join('\n');
-        const s = joined.indexOf('{');
-        const en = joined.lastIndexOf('}');
-        planData = JSON.parse(joined.substring(s, en + 1));
-      } catch (e2) {
-        return NextResponse.json({ error: 'Failed to parse AI response', raw: rawText.substring(0, 200) }, { status: 500 });
-      }
-    }
+let planData;
+try {
+  // Strip markdown code fences if present
+  let cleaned = rawText
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+
+  // Extract JSON object
+  const jsonStart = cleaned.indexOf('{');
+  const jsonEnd = cleaned.lastIndexOf('}');
+  if (jsonStart === -1 || jsonEnd === -1) {
+    throw new Error('No JSON found in response');
+  }
+  cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+  planData = JSON.parse(cleaned);
+} catch (e) {
+  try {
+    const lines = rawText.split('\n').filter(l => !l.startsWith('```'));
+    const joined = lines.join('\n');
+    const s = joined.indexOf('{');
+    const en = joined.lastIndexOf('}');
+    planData = JSON.parse(joined.substring(s, en + 1));
+  } catch (e2) {
+    return NextResponse.json(
+      { error: 'Failed to parse AI response', raw: rawText.substring(0, 200) },
+      { s
 
     if (profile.user_id) {
       await supabaseServer.from('ai_plans').insert({
