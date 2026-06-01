@@ -176,10 +176,12 @@ try {
     const en = joined.lastIndexOf('}');
     planData = JSON.parse(joined.substring(s, en + 1));
   } catch (e2) {
-    return NextResponse.json(
+   return NextResponse.json(
       { error: 'Failed to parse AI response', raw: rawText.substring(0, 200) },
-      { s
-
+      { status: 500 }
+    );
+  }
+}
     if (profile.user_id) {
       await supabaseServer.from('ai_plans').insert({
         user_id: profile.user_id,
