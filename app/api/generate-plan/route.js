@@ -18,6 +18,7 @@ function parseJSON(rawText) {
     let cleaned = rawText
       .replace(/```json/gi, '')
       .replace(/```/gi, '')
+      .replace(/`/gi, '')
       .trim();
     const start = cleaned.indexOf('{');
     const end = cleaned.lastIndexOf('}');
@@ -34,7 +35,6 @@ function parseJSON(rawText) {
   } catch (e2) {}
   return null;
 }
-
 export async function POST(request) {
   try {
     const body = await request.json();
