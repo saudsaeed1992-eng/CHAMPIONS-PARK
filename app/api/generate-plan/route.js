@@ -35,6 +35,7 @@ function parseJSON(rawText) {
   } catch (e2) {}
   return null;
 }
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -49,27 +50,21 @@ export async function POST(request) {
     const weightKg = parseFloat(profile.starting_weight) || 80;
 
     const injuriesText = profile.injuries
-      ? 'Injuries: ' + profile.injuries + '. Avoid aggravating exercises.'
+      ? 'Injuries: ' + profile.injuries + '. Avoid these.'
       : 'No injuries.';
 
     const equipmentText = profile.gym_equipment && profile.gym_equipment.length > 0
       ? 'Equipment: ' + profile.gym_equipment.join(', ') + '.'
-      : 'Equipment: bodyweight only.';
+      : 'Bodyweight only.';
 
     const schedule = profile.schedule || {};
     const workoutStart = schedule.workout_start || '07:00';
     const workoutEnd = schedule.workout_end || '08:00';
     const planStartDate = schedule.plan_start_date || new Date().toISOString().split('T')[0];
     const planEndDate = schedule.plan_end_date || '';
-    const wakeTime = schedule.wake_time || '06:00';
-    const sleepTime = schedule.sleep_time || '23:00';
-    const workStart = schedule.work_start || '09:00';
-    const workEnd = schedule.work_end || '17:00';
-    const mealsPerDay = schedule.meals_per_day || '3';
+    const mealsPerDay = parseInt(schedule.meals_per_day) || 3;
     const restDays = schedule.rest_days && schedule.rest_days.length > 0
       ? schedule.rest_days.join(', ') : 'Saturday, Sunday';
-    const dailyRoutine = schedule.daily_routine || '';
-    const notes = schedule.notes || '';
 
     const planDays = planStartDate && planEndDate
       ? Math.ceil((new Date(planEndDate) - new Date(planStartDate)) / (1000 * 60 * 60 * 24))
@@ -81,93 +76,129 @@ export async function POST(request) {
     const workoutDaysList = daysOfWeek.filter(d => !restDaysList.includes(d));
     const workoutDaysPerWeek = workoutDaysList.length;
 
-    const scheduleText = 'Workout: ' + workoutStart + '-' + workoutEnd
-      + ', Plan: ' + planWeeks + ' weeks'
-      + ', Wake: ' + wakeTime + ', Sleep: ' + sleepTime
-      + ', Work: ' + workStart + '-' + workEnd
-      + ', Meals/day: ' + mealsPerDay
-      + ', Rest: ' + restDays
-      + ', Train on: ' + workoutDaysList.join(', ')
-      + (dailyRoutine ? ', Routine: ' + dailyRoutine : '')
-      + (notes ? ', Notes: ' + notes : '');
+    // Build weeks array for the prompt
+    const weeksArray = [];
+    for (let w = 1; w <= planWeeks; w++) {
+      const days = workoutDaysList.map(day => ({
+        day,
+        name: 'Workout',
+        emoji: '💪',
+        type: goal_type === 'weight_loss' ? 'cardio' : 'strength',
+        duration: workoutStart + '-' + workoutEnd,
+        exercises: []
+      }));
+      weeksArray.push({ week: w, days });
+    }
 
-    let systemPrompt = '';
-    let userPrompt = '';
+    const mealsArray = [];
+    const mealNames = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Pre-Workout', 'Post-Workout'];
+    for (let m = 0; m < mealsPerDay; m++) {
+      mealsArray.push({
+        meal: mealNames[m] || 'Meal ' + (m + 1),
+        name: '',
+        calories: 0,
+        protein: '',
+        ingredients: [],
+        instructions: ''
+      });
+    }
 
     if (goal_type === 'weight_loss') {
       const dailyCalories = Math.round(weightKg * 24 * 0.8);
       const proteinGrams = Math.round(weightKg * 1.8);
 
-      systemPrompt = 'You are a fat loss trainer. '
-        + languageInstruction
-        + ' IMPORTANT: Reply with ONLY a JSON object. No backticks. No markdown. No code fences. Start directly with { and end with }.';
+      const systemPrompt = 'You are a fat loss trainer. ' + languageInstruction + ' Reply with ONLY raw JSON. No backticks. No markdown. Start with { end with }.';
 
-      userPrompt = 'Fat loss plan for: ' + profile.full_name
-        + ', Age ' + profile.age + ', ' + profile.gender
-        + ', ' + weightKg + 'kg to ' + profile.target_weight + 'kg, ' + profile.height_cm + 'cm. '
-        + injuriesText + ' ' + equipmentText + ' ' + scheduleText + '. '
-        + 'Calories: ' + dailyCalories + ', Protein: ' + proteinGrams + 'g. '
-        + languageInstruction + ' '
-        + 'Train ONLY on: ' + workoutDaysList.join(', ') + '. NO training on: ' + restDays + '. '
-        + 'Max 4 exercises per day. ' + mealsPerDay + ' meals. Keep notes under 6 words. Keep instructions under 12 words. Day names must be in English. '
-        + 'Reply with this JSON structure only:\n'
-        + '{"plan_type":"weight_loss",'
-        + '"weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":8000,"water_liters":2.5},'
-        + '"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"Upper Body","emoji":"💪","type":"cardio","duration":"45 min","exercises":[{"name":"Jumping Jacks","sets":"3","reps":"20","rest":"30s","notes":"keep pace steady"}]}]}]},'
-        + '"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"Oats Bowl","calories":400,"protein":"25g","ingredients":["80g oats","200ml milk"],"instructions":"Mix oats with milk and heat"}]},'
-        + '"safety_notes":["Stay hydrated"],"motivation_message":"You can do this!"}';
+      const userPrompt = 'Create ' + planWeeks + '-week fat loss plan. '
+        + profile.full_name + ', ' + profile.age + 'y, ' + profile.gender + ', '
+        + weightKg + 'kg->' + profile.target_weight + 'kg, ' + profile.height_cm + 'cm. '
+        + injuriesText + ' ' + equipmentText
+        + ' Train: ' + workoutDaysList.join(',') + '. Rest: ' + restDays + '.'
+        + ' ' + dailyCalories + 'cal, ' + proteinGrams + 'g protein.'
+        + ' ' + languageInstruction
+        + ' Rules: 3 exercises/day max, notes under 5 words, instructions under 10 words, day names in English only.'
+        + '\n\nJSON:\n'
+        + '{"plan_type":"weight_loss","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":8000,"water_liters":2.5},'
+        + '"workout_plan":{"weeks":' + JSON.stringify(weeksArray) + '},'
+        + '"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":' + JSON.stringify(mealsArray) + '},'
+        + '"safety_notes":[],"motivation_message":""}';
+
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 16000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+
+      const rawText = message.content[0].text.trim();
+      const planData = parseJSON(rawText);
+
+      if (!planData) {
+        return NextResponse.json(
+          { error: 'Failed to parse AI response', raw: rawText.substring(0, 300) },
+          { status: 500 }
+        );
+      }
+
+      if (profile.user_id) {
+        await supabaseServer.from('ai_plans').insert({
+          user_id: profile.user_id,
+          plan_type: goal_type,
+          plan_content: planData,
+          language: language,
+        });
+      }
+
+      return NextResponse.json({ success: true, plan: planData });
 
     } else {
       const dailyCalories = Math.round(weightKg * 24 * 1.1);
       const proteinGrams = Math.round(weightKg * 2);
 
-      systemPrompt = 'You are a bodybuilding coach. '
-        + languageInstruction
-        + ' IMPORTANT: Reply with ONLY a JSON object. No backticks. No markdown. No code fences. Start directly with { and end with }.';
+      const systemPrompt = 'You are a bodybuilding coach. ' + languageInstruction + ' Reply with ONLY raw JSON. No backticks. No markdown. Start with { end with }.';
 
-      userPrompt = 'Bodybuilding plan for: ' + profile.full_name
-        + ', Age ' + profile.age + ', ' + profile.gender
-        + ', ' + weightKg + 'kg to ' + profile.target_weight + 'kg, ' + profile.height_cm + 'cm. '
-        + injuriesText + ' ' + equipmentText + ' ' + scheduleText + '. '
-        + 'Calories: ' + dailyCalories + ', Protein: ' + proteinGrams + 'g. '
-        + languageInstruction + ' '
-        + 'Train ONLY on: ' + workoutDaysList.join(', ') + '. NO training on: ' + restDays + '. '
-        + 'Use Push/Pull/Legs split. Max 4 exercises per day. ' + mealsPerDay + ' high-protein meals. Keep notes under 6 words. Keep instructions under 12 words. Day names must be in English. '
-        + 'Reply with this JSON structure only:\n'
-        + '{"plan_type":"bodybuilding",'
-        + '"weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":6000,"water_liters":3.5},'
-        + '"workout_plan":{"weeks":[{"week":1,"days":[{"day":"Monday","name":"Push Day","emoji":"💪","type":"strength","duration":"60 min","exercises":[{"name":"Bench Press","sets":"4","reps":"10","rest":"90s","notes":"control the descent"}]}]}]},'
-        + '"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":[{"meal":"Breakfast","name":"Protein Oats","calories":600,"protein":"45g","ingredients":["100g oats","2 eggs","30g protein powder"],"instructions":"Cook oats add eggs and protein"}]},'
-        + '"safety_notes":["Warm up before lifting"],"motivation_message":"Build your champion body!"}';
-    }
+      const userPrompt = 'Create ' + planWeeks + '-week bodybuilding plan. '
+        + profile.full_name + ', ' + profile.age + 'y, ' + profile.gender + ', '
+        + weightKg + 'kg->' + profile.target_weight + 'kg, ' + profile.height_cm + 'cm. '
+        + injuriesText + ' ' + equipmentText
+        + ' Train: ' + workoutDaysList.join(',') + '. Rest: ' + restDays + '.'
+        + ' ' + dailyCalories + 'cal, ' + proteinGrams + 'g protein.'
+        + ' ' + languageInstruction
+        + ' Rules: Push/Pull/Legs split, 3 exercises/day max, notes under 5 words, instructions under 10 words, day names in English only.'
+        + '\n\nJSON:\n'
+        + '{"plan_type":"bodybuilding","weekly_targets":{"calories_per_day":' + dailyCalories + ',"protein_grams":' + proteinGrams + ',"workout_days":' + workoutDaysPerWeek + ',"daily_steps":6000,"water_liters":3.5},'
+        + '"workout_plan":{"weeks":' + JSON.stringify(weeksArray) + '},'
+        + '"meal_plan":{"daily_calories":' + dailyCalories + ',"meals":' + JSON.stringify(mealsArray) + '},'
+        + '"safety_notes":[],"motivation_message":""}';
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 8000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-
-    const rawText = message.content[0].text.trim();
-    const planData = parseJSON(rawText);
-
-    if (!planData) {
-      return NextResponse.json(
-        { error: 'Failed to parse AI response', raw: rawText.substring(0, 300) },
-        { status: 500 }
-      );
-    }
-
-    if (profile.user_id) {
-      await supabaseServer.from('ai_plans').insert({
-        user_id: profile.user_id,
-        plan_type: goal_type,
-        plan_content: planData,
-        language: language,
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 16000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
       });
-    }
 
-    return NextResponse.json({ success: true, plan: planData });
+      const rawText = message.content[0].text.trim();
+      const planData = parseJSON(rawText);
+
+      if (!planData) {
+        return NextResponse.json(
+          { error: 'Failed to parse AI response', raw: rawText.substring(0, 300) },
+          { status: 500 }
+        );
+      }
+
+      if (profile.user_id) {
+        await supabaseServer.from('ai_plans').insert({
+          user_id: profile.user_id,
+          plan_type: goal_type,
+          plan_content: planData,
+          language: language,
+        });
+      }
+
+      return NextResponse.json({ success: true, plan: planData });
+    }
 
   } catch (error) {
     return NextResponse.json(
