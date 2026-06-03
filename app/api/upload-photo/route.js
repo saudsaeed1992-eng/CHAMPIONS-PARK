@@ -26,27 +26,49 @@ export async function POST(request) {
     const fileName = `${userId}/${photoType}_week${weekNumber}_${Date.now()}.${fileExt}`;
     const buffer = new Uint8Array(await file.arrayBuffer());
 
+    // Upload to storage
     const { error: uploadError } = await supabaseServer.storage
       .from('champion-photos')
-      .upload(fileName, buffer, { contentType: file.type, upsert: false });
+      .upload(fileName, buffer, { contentType: file.type, upsert: true });
 
     if (uploadError) {
       return NextResponse.json({ error: 'Upload failed: ' + uploadError.message }, { status: 500 });
     }
 
+    // Get public URL
     const { data: urlData } = supabaseServer.storage
       .from('champion-photos')
       .getPublicUrl(fileName);
 
-    await supabaseServer.from('user_photos').insert({
+    // Insert into user_photos table
+    const { error: insertError } = await supabaseServer.from('user_photos').insert({
       user_id: userId,
       photo_url: urlData.publicUrl,
       photo_type: photoType,
       week_number: weekNumber,
     });
 
+    if (insertError) {
+      // Log error but still return success since file uploaded to storage
+      console.error('user_photos insert error:', insertError.message);
+      // Try upsert as fallback
+      const { error: upsertError } = await supabaseServer.from('user_photos').upsert({
+        user_id: userId,
+        photo_url: urlData.publicUrl,
+        photo_type: photoType,
+        week_number: weekNumber,
+      });
+      if (upsertError) {
+        console.error('user_photos upsert error:', upsertError.message);
+      }
+    }
+
     return NextResponse.json({ success: true, url: urlData.publicUrl });
+
   } catch (error) {
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
